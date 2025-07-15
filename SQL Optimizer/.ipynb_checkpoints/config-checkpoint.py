@@ -4,11 +4,7 @@
 
 # DB connection details are stored here. 
 DB_CONFIG = {
-    "host" : "localhost", 
-    "port" : 3306, 
-    "user" : "your_username", 
-    "password" : "your_password", 
-    "database" : "your_database   
+    "db_path" : "your_database.sqlite3"
 } 
 
 # Optimization thresholds defined here. ***(may want to add more)***
