@@ -1,1 +1,1 @@
-# SQL-Query-Optimization-Tool
+# SQL Query Optimization Tool
