@@ -4,15 +4,15 @@
 
 # Resource importing and management. 
 import sqlite3
-from .config import DB_CONFIG
+from config import DB_CONFIG
 
-# Initialize the DBConnector class to encapsulatee methods that connect to the MySQL database and perform common operations.
+# Initialize the DBConnector class to encapsulatee methods that connect to the SQLite database and perform common operations.
 class DBConnector: 
 
     # Establishes a connection to the DB using credentials outlined in DB_CONFIG.
     def __init__(self): 
         self.conn = sqlite3.connect(DB_CONFIG["db_path"])
-        self.conn.row_factory sqlite3.Row
+        self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
 
     # Executes a regular SQL query and returns all rows from the resulting query set. 
@@ -22,7 +22,7 @@ class DBConnector:
         return [dict(row) for row in rows]
         
 
-    # Returns MySQL's query plan illuminating how MYSQL will execute the given query.
+    # Returns SQLite's query plan illuminating how SQLite will execute the given query.
     def get_explain(self, query : str): 
         explain_query = f"EXPLAIN {query}" 
         self.cursor.execute(explain_query) 
