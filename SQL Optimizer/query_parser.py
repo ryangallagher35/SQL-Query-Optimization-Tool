@@ -6,6 +6,7 @@
 import sqlparse 
 from sqlparse.sql import IdentifierList, Identifier 
 from sqlparse.tokens import DML, Keyword, Whitespace, Wildcard
+import re 
 
 # Defines the query parser class and its pertainent methods. 
 class QueryParser: 
@@ -100,6 +101,7 @@ class QueryParser:
     
         return columns
 
+    
     # Extracts the joins used in the SQL query. 
     def get_joins(self):
         joins = []
@@ -131,6 +133,7 @@ class QueryParser:
     
         return joins
 
+
     # Returns the conditions specified by the WHERE clause.
     def get_conditions(self):
         conditions = []
@@ -154,11 +157,11 @@ class QueryParser:
 
                     if val.upper() == "BETWEEN":
                         inside_between = True
-                        current_condition += " BETWEEN"
+                        current_condition += "BETWEEN"
                         continue
 
                     if inside_between and val.upper() == "AND":
-                        current_condition += " AND"
+                        current_condition += "AND"
                         continue
                     if subtoken.ttype is Keyword and val.upper() in ("AND", "OR") and not inside_between:
                         if current_condition.strip():
@@ -179,6 +182,7 @@ class QueryParser:
                 break
     
         return conditions
+    
 
     # Returns a summary of the key components of the query.
     def summarize_query(self): 

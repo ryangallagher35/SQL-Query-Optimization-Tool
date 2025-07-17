@@ -197,6 +197,7 @@ class TestGetConditions(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["region IN ('North', 'East')"])
 
+
 # Testing suite for the summarize_query method.
 class TestSummarizeQuery(unittest.TestCase):
 
@@ -236,7 +237,7 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["tables"], ["orders"])
         self.assertEqual(summary["columns"], ["o.*"])
         self.assertEqual(summary["joins"], [])
-        self.assertEqual(summary["conditions"], ["o.date  BETWEEN '2024-01-01'  AND '2024-12-31'"])
+        self.assertEqual(summary["conditions"], ["o.date BETWEEN '2024-01-01' AND '2024-12-31'"])
 
     # Test summary for query without WHERE or JOIN
     def test_summary_minimal(self):
