@@ -189,7 +189,7 @@ class TestGetConditions(unittest.TestCase):
     def test_between_condition(self):
         query = "SELECT * FROM orders WHERE amount BETWEEN 100 AND 500;"
         qp = QueryParser(query)
-        self.assertEqual(qp.get_conditions(), ["amount  BETWEEN 100  AND 500"])
+        self.assertEqual(qp.get_conditions(), ["amount BETWEEN 100 AND 500"])
 
     # Test WHERE clause using IN
     def test_in_condition(self):
@@ -210,7 +210,6 @@ class TestSummarizeQuery(unittest.TestCase):
         """
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        print(summary["tables"])
         self.assertEqual(set(summary["tables"]), {"users", "orders"})
         self.assertEqual(set(summary["columns"]), {"id", "name", "amount"})
         self.assertEqual(summary["joins"], ["INNER JOIN orders o"])
@@ -229,7 +228,6 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["joins"], [])
         self.assertEqual(summary["conditions"], [])
 
-    '''
     # Test summary with BETWEEN and alias
     def test_summary_with_between(self):
         query = "SELECT o.* FROM orders o WHERE o.date BETWEEN '2024-01-01' AND '2024-12-31';"
@@ -239,7 +237,6 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["columns"], ["o.*"])
         self.assertEqual(summary["joins"], [])
         self.assertEqual(summary["conditions"], ["o.date  BETWEEN '2024-01-01'  AND '2024-12-31'"])
-    '''
 
     # Test summary for query without WHERE or JOIN
     def test_summary_minimal(self):
@@ -256,7 +253,6 @@ class TestSummarizeQuery(unittest.TestCase):
         query = "SeLeCt * FrOm Sales s LeFt JoIn Regions r On s.region_id = r.id WhErE r.name = 'East';"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        print(summary["tables"])
         self.assertEqual(set(summary["tables"]), {"Sales", "Regions"})
         self.assertEqual(summary["columns"], ["*"])
         self.assertEqual(summary["joins"], ["LeFt JoIn Regions r"])

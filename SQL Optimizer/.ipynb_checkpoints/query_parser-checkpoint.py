@@ -16,21 +16,48 @@ class QueryParser:
         self.parsed = sqlparse.parse(query)[0]
 
     # Extracts the table names used in the SQL query. 
-    def get_tables(self): 
+    def get_tables(self):
         tables = []
-        from_or_join_seen = False
-
-        for token in self.parsed.tokens:
-            if from_or_join_seen:
-                if isinstance(token, (sqlparse.sql.Identifier, sqlparse.sql.IdentifierList)):
-                    if isinstance(token, sqlparse.sql.IdentifierList):
-                        for identifier in token.get_identifiers():
-                            tables.append(identifier.get_real_name())
-                    else:
-                        tables.append(token.get_real_name())
-                    from_or_join_seen = False
-            if token.ttype is sqlparse.tokens.Keyword and token.value.upper() in ("FROM", "JOIN"):
-                from_or_join_seen = True
+        expecting_table = False
+    
+        join_keywords = {
+            "JOIN", "INNER JOIN", "LEFT JOIN", "LEFT OUTER JOIN",
+            "RIGHT JOIN", "RIGHT OUTER JOIN", "FULL JOIN", "FULL OUTER JOIN",
+            "CROSS JOIN", "NATURAL JOIN"
+        }
+    
+        parsed = self.parsed
+        tokens = parsed.tokens
+    
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+    
+            if token.ttype is Keyword and token.value.upper() == "FROM":
+                expecting_table = True
+    
+            elif token.ttype is Keyword:
+                combined_keyword = token.value.upper()
+                j = i + 1
+                while j < len(tokens) and tokens[j].ttype is Keyword:
+                    combined_keyword += " " + tokens[j].value.upper()
+                    j += 1
+    
+                if combined_keyword in join_keywords:
+                    expecting_table = True
+                    i = j - 1
+    
+            elif expecting_table:
+                if isinstance(token, Identifier):
+                    tables.append(token.get_real_name())
+                    expecting_table = False
+                elif isinstance(token, IdentifierList):
+                    for identifier in token.get_identifiers():
+                        tables.append(identifier.get_real_name())
+                    expecting_table = False
+    
+            i += 1
+    
         return tables
 
     # Extracts the column names used in the SQL query. 
