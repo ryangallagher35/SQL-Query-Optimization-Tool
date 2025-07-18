@@ -167,8 +167,8 @@ class TestCheckFilesort(unittest.TestCase):
 # Tests analyze method. 
 class TestAnalyzer(unittest.TestCase):
 
+    # Sample explain plans for tests.
     def setUp(self):
-        # Sample explain plans for tests
         self.full_table_scan_plan = [
             {"detail": "SCAN TABLE users"},
             {"detail": "SEARCH TABLE orders USING INDEX order_idx"}
@@ -187,6 +187,7 @@ class TestAnalyzer(unittest.TestCase):
             {"detail": "SEARCH TABLE users USING INDEX user_idx"}
         ]
 
+    # Tests full table scan instance.
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": True, "missing_index": True, "using_filesort_penalty": True})
     def test_detect_full_table_scan(self):
         analyzer = ExplainAnalyzer(self.full_table_scan_plan)
@@ -195,6 +196,7 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(result["issues_detected"][0]["type"], "Full Table Scan")
         self.assertIn("scan", result["issues_detected"][0]["message"].lower())
 
+    # Tests missing index instance.
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": False, "missing_index": True, "using_filesort_penalty": False})
     def test_detect_missing_index(self):
         analyzer = ExplainAnalyzer(self.missing_index_plan)
@@ -203,16 +205,17 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(result["issues_detected"][0]["type"], "Missing Index")
         self.assertIn("no index", result["issues_detected"][0]["message"].lower())
 
+    # Tests whether the code flags the presence of filesorts and inefficient temp data structures.
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": False, "missing_index": False, "using_filesort_penalty": True})
     def test_detect_filesort_and_temp(self):
         analyzer = ExplainAnalyzer(self.filesort_temp_plan)
         result = analyzer.analyze()
-        # Should detect 2 issues: one temp b-tree and one filesort
         types = [issue["type"] for issue in result["issues_detected"]]
         self.assertIn("Using Temporary Structure", types)
         self.assertIn("Filesort", types)
         self.assertEqual(result["total_issues"], 2)
 
+    # Tests if code handles clean queries correctly.
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": True, "missing_index": True, "using_filesort_penalty": True})
     def test_no_issues_detected(self):
         analyzer = ExplainAnalyzer(self.clean_plan)
@@ -220,25 +223,25 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(result["total_issues"], 0)
         self.assertEqual(result["issues_detected"], [])
 
+    # Tests whether case insensitivity is handled correctly. 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": True})
     def test_full_table_scan_case_insensitivity(self):
-        # Test that check works case insensitively
         plan = [{"detail": "scan table"}]
         analyzer = ExplainAnalyzer(plan)
         result = analyzer.analyze()
         self.assertEqual(result["total_issues"], 1)
 
+    # Tests the case when a table search employs an index. 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"missing_index": True})
     def test_missing_index_false_positive(self):
-        # Ensure that SEARCH with USING INDEX is NOT flagged
         plan = [{"detail": "SEARCH TABLE users USING INDEX"}]
         analyzer = ExplainAnalyzer(plan)
         result = analyzer.analyze()
         self.assertEqual(result["total_issues"], 0)
 
+    # Tests filesort presence instance. 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"using_filesort_penalty": True})
     def test_filesort_detection_no_sqlite_actual(self):
-        # Although SQLite doesn't say 'USING FILESORT', our heuristic still flags it if present
         plan = [{"detail": "operation USING FILESORT"}]
         analyzer = ExplainAnalyzer(plan)
         result = analyzer.analyze()
