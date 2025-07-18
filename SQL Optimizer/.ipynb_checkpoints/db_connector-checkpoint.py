@@ -15,6 +15,7 @@ class DBConnector:
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
 
+    
     # Executes a regular SQL query and returns all rows from the resulting query set. 
     def execute_query(self, query : str): 
         self.cursor.execute(query) 

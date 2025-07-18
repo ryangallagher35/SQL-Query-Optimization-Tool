@@ -9,5 +9,7 @@ DB_CONFIG = {
 
 # Optimization thresholds defined here. ***(may want to add more)***
 OPTIMIZATION_THRESHOLDS = { 
-    "using_filesort_penality" : True
+    "using_filesort_penalty" : True,
+    "full_table_scan" : True,
+    "missing_index" : True
 } 

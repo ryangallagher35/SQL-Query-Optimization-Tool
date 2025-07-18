@@ -59,4 +59,5 @@ print("\nExplain plan for 'SELECT * FROM users WHERE age > 25':")
 for row in explain:
     print(row)
 
+
 db.close()
