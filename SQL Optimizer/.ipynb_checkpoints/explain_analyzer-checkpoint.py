@@ -4,8 +4,6 @@
 
 # Resource importing and management
 from config import OPTIMIZATION_THRESHOLDS
-import unittest 
-from unittest.mock import patch
 
 # Analyzes output from get_explain and flags inefficiencies based on thresholds confined in config.py.
 class ExplainAnalyzer:

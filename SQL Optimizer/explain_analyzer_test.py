@@ -4,6 +4,7 @@
 
 # Resource importing and management. 
 import unittest 
+from unittest.mock import patch
 from explain_analyzer import ExplainAnalyzer
 
 # Testing suite for _check_full_tables_scan method. 
@@ -163,12 +164,101 @@ class TestCheckFilesort(unittest.TestCase):
         self.assertIn('Using Temporary Structure', types)
         self.assertIn('Filesort', types)
 
+class TestAnalyze(unittest.TestCase):
+
+    def setUp(self):
+        # This will be patched per test to control thresholds
+        self.default_thresholds = {
+            "full_table_scan": True,
+            "missing_index": True,
+            "using_filesort_penalty": True
+        }
+
+    @patch('config.OPTIMIZATION_THRESHOLDS', new_callable=lambda: {
+        "full_table_scan": True,
+        "missing_index": True,
+        "using_filesort_penalty": True
+    })
+    def test_analyze_detects_all_issues(self, mock_thresholds):
+        explain_plan = [
+            {"detail": "TABLE users SCAN"},  # full table scan
+            {"detail": "INDEX SEARCH WITHOUT USING INDEX"},  # missing index
+            {"detail": "USING TEMP B-TREE"},  # temp structure
+            {"detail": "some other detail USING FILESORT"}  # filesort
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        result = analyzer.analyze()
+
+        self.assertEqual(result["total_issues"], 4)
+        types = [issue["type"] for issue in result["issues_detected"]]
+        self.assertIn("Full Table Scan", types)
+        self.assertIn("Missing Index", types)
+        self.assertIn("Using Temporary Structure", types)
+        self.assertIn("Filesort", types)
+
+    @patch('config.OPTIMIZATION_THRESHOLDS', new_callable=lambda: {
+        "full_table_scan": False,
+        "missing_index": True,
+        "using_filesort_penalty": False
+    })
+    def test_analyze_respects_thresholds(self, mock_thresholds):
+        explain_plan = [
+            {"detail": "TABLE users SCAN"},  # full table scan (should be ignored)
+            {"detail": "INDEX SEARCH WITHOUT USING INDEX"},  # missing index
+            {"detail": "USING TEMP B-TREE"},  # temp structure (should be ignored)
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        result = analyzer.analyze()
+
+        self.assertEqual(result["total_issues"], 1)
+        self.assertEqual(result["issues_detected"][0]["type"], "Missing Index")
+
+    @patch('config.OPTIMIZATION_THRESHOLDS', new_callable=lambda: {
+        "full_table_scan": True,
+        "missing_index": False,
+        "using_filesort_penalty": True
+    })
+    def test_analyze_partial_thresholds(self, mock_thresholds):
+        explain_plan = [
+            {"detail": "TABLE users SCAN"},  # full table scan
+            {"detail": "INDEX SEARCH WITHOUT USING INDEX"},  # missing index (ignored)
+            {"detail": "USING TEMP TABLE"},  # temp structure
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        result = analyzer.analyze()
+
+        self.assertEqual(result["total_issues"], 2)
+        types = [issue["type"] for issue in result["issues_detected"]]
+        self.assertIn("Full Table Scan", types)
+        self.assertIn("Using Temporary Structure", types)
+        self.assertNotIn("Missing Index", types)
+
+    @patch('config.OPTIMIZATION_THRESHOLDS', new_callable=lambda: {
+        "full_table_scan": True,
+        "missing_index": True,
+        "using_filesort_penalty": True
+    })
+    def test_analyze_no_issues(self, mock_thresholds):
+        explain_plan = [
+            {"detail": "INDEX SEARCH USING INDEX"},  # index used properly
+            {"detail": "SCAN USING INDEX"},  # scan using index
+            {"detail": "NO TEMP OR FILESORT HERE"}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        result = analyzer.analyze()
+
+        self.assertEqual(result["total_issues"], 0)
+        self.assertEqual(result["issues_detected"], [])
+
 # Run the tests.
-suite = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
-unittest.TextTestRunner(verbosity = 2).run(suite)
+suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
+unittest.TextTestRunner(verbosity = 2).run(suite1)
 
 suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckMissingIndex)
 unittest.TextTestRunner(verbosity = 2).run(suite2)
 
 suite3 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
 unittest.TextTestRunner(verbosity = 2).run(suite3)
+
+suite4 = unittest.TestLoader().loadTestsFromTestCase(TestAnalyze)
+unittest.TextTestRunner(verbosity=2).run(suite4)
