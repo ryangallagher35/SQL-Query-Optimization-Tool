@@ -38,6 +38,7 @@ class ExplainAnalyzer:
                     "type": "Full Table Scan",
                     "message": f"Query performs full scan: '{row['detail']}'"
                 })
+            
 
     # Detects if an index was not used where expected
     def _check_missing_index(self):
@@ -63,6 +64,7 @@ class ExplainAnalyzer:
                     "type": "Filesort",
                     "message": f"Filesort operation detected: '{row['detail']}'"
                 })
+
 
 
      
