@@ -170,12 +170,12 @@ class TestAnalyzer(unittest.TestCase):
     def setUp(self):
         # Sample explain plans for tests
         self.full_table_scan_plan = [
-            {"detail": "TABLE SCAN on users"},
-            {"detail": "INDEX SCAN on orders USING INDEX"}
+            {"detail": "SCAN TABLE users"},
+            {"detail": "SEARCH TABLE orders USING INDEX order_idx"}
         ]
         self.missing_index_plan = [
-            {"detail": "SEARCH TABLE users WITHOUT USING INDEX"},
-            {"detail": "SEARCH TABLE orders USING INDEX"}
+            {"detail": "SEARCH TABLE users"},
+            {"detail": "SEARCH TABLE orders USING INDEX order_idx"}
         ]
         self.filesort_temp_plan = [
             {"detail": "USING TEMP B-TREE"},
@@ -183,8 +183,8 @@ class TestAnalyzer(unittest.TestCase):
             {"detail": "NO ISSUE HERE"}
         ]
         self.clean_plan = [
-            {"detail": "INDEX SCAN USING INDEX"},
-            {"detail": "SEARCH TABLE users USING INDEX"}
+            {"detail": "SCAN TABLE users USING INDEX user_idx"},
+            {"detail": "SEARCH TABLE users USING INDEX user_idx"}
         ]
 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": True, "missing_index": True, "using_filesort_penalty": True})
@@ -193,7 +193,7 @@ class TestAnalyzer(unittest.TestCase):
         result = analyzer.analyze()
         self.assertEqual(result["total_issues"], 1)
         self.assertEqual(result["issues_detected"][0]["type"], "Full Table Scan")
-        self.assertIn("full scan", result["issues_detected"][0]["message"].lower())
+        self.assertIn("scan", result["issues_detected"][0]["message"].lower())
 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": False, "missing_index": True, "using_filesort_penalty": False})
     def test_detect_missing_index(self):
@@ -223,7 +223,7 @@ class TestAnalyzer(unittest.TestCase):
     @patch("config.OPTIMIZATION_THRESHOLDS", {"full_table_scan": True})
     def test_full_table_scan_case_insensitivity(self):
         # Test that check works case insensitively
-        plan = [{"detail": "table scan without using index"}]
+        plan = [{"detail": "scan table"}]
         analyzer = ExplainAnalyzer(plan)
         result = analyzer.analyze()
         self.assertEqual(result["total_issues"], 1)

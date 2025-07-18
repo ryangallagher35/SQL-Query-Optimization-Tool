@@ -33,7 +33,7 @@ class ExplainAnalyzer:
     def _check_full_table_scan(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "SCAN" in detail and "USING INDEX" not in detail:
+            if "SCAN" in detail and "INDEX" not in detail:
                 self.issues.append({
                     "type": "Full Table Scan",
                     "message": f"Query performs full scan: '{row['detail']}'"
@@ -44,7 +44,7 @@ class ExplainAnalyzer:
     def _check_missing_index(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "SEARCH" in detail and "USING INDEX" not in detail:
+            if "SEARCH" in detail and "INDEX" not in detail:
                 self.issues.append({
                     "type": "Missing Index",
                     "message": f"No index used in search: '{row['detail']}'"
