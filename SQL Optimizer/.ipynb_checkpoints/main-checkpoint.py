@@ -11,6 +11,7 @@ def analyze_query(query):
     db = DBConnector(db_path = config.DB_CONFIG["db_path"])
     
     try:
+        query_results = db.execute_query(query)
         explain_rows = db.get_explain(query)
         
         issues_detected = []
@@ -33,7 +34,8 @@ def analyze_query(query):
             "query_summary": summary,
             "issues": issues_detected,
             "suggestions": suggestions,
-            "explain_plan": explain_rows
+            "explain_plan": explain_rows, 
+            "query_results" : query_results
         }
         
     except Exception as e:
@@ -44,7 +46,7 @@ def analyze_query(query):
 
 if __name__ == "__main__":
     # Prompt user for database file path
-    user_db_path = input("Please enter the path to your database file:\n").strip()
+    user_db_path = input("Please enter the path to your database file:\n").strip().replace('"', '').replace("'", '')
     print("Exists:", os.path.isfile(user_db_path))
     config.DB_CONFIG["db_path"] = user_db_path
 
