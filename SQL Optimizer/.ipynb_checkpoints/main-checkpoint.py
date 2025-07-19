@@ -8,7 +8,6 @@ import sys
 import os
 
 def analyze_query(query):
-    #db = DBConnector()
     db = DBConnector(db_path = config.DB_CONFIG["db_path"])
     
     try:
