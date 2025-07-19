@@ -3,9 +3,13 @@
 from db_connector import DBConnector
 from query_parser import QueryParser
 from suggestions import Suggestions
+import config
+import sys
+import os
 
 def analyze_query(query):
-    db = DBConnector()
+    #db = DBConnector()
+    db = DBConnector(db_path = config.DB_CONFIG["db_path"])
     
     try:
         explain_rows = db.get_explain(query)
@@ -39,24 +43,32 @@ def analyze_query(query):
     finally:
         db.close()
 
-# Take user input for the SQL query
-input_query = input("Enter your SQL query to analyze:\n")
+if __name__ == "__main__":
+    # Prompt user for database file path
+    user_db_path = input("Please enter the path to your database file:\n").strip()
+    print("Exists:", os.path.isfile(user_db_path))
+    config.DB_CONFIG["db_path"] = user_db_path
 
-# Analyze the user input query
-result = analyze_query(input_query)
+    # Take user input for the SQL query
+    input_query = input("Enter your SQL query to analyze:\n")
+    
+    # Analyze the user input query
+    result = analyze_query(input_query)
+    
+    # Display the results
+    if "error" in result:
+        print(f"Error analyzing query: {result['error']}")
+    else:
+        print("\nQuery Summary:")
+        print(result["query_summary"])
+        print("\nDetected Issues:")
+        for issue in result["issues"]:
+            print(f"- {issue['type']}: {issue['message']}")
+        print("\nSuggestions:")
+        for suggestion in result["suggestions"]:
+            print(f"- {suggestion}")
+        print("\nExplain Plan:")
+        for row in result["explain_plan"]:
+            print(row)
+        
 
-# Display the results
-if "error" in result:
-    print(f"Error analyzing query: {result['error']}")
-else:
-    print("\nQuery Summary:")
-    print(result["query_summary"])
-    print("\nDetected Issues:")
-    for issue in result["issues"]:
-        print(f"- {issue['type']}: {issue['message']}")
-    print("\nSuggestions:")
-    for suggestion in result["suggestions"]:
-        print(f"- {suggestion}")
-    print("\nExplain Plan:")
-    for row in result["explain_plan"]:
-        print(row)
