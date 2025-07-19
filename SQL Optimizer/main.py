@@ -1,5 +1,8 @@
-# SQL Query Optimization Tool - Main Integration Notebook
+# Ryan Gallagher
+# SQL Query Optimization Tool 
+# main.py
 
+# Resource importing and management. 
 from db_connector import DBConnector
 from query_parser import QueryParser
 from suggestions import Suggestions
@@ -7,6 +10,7 @@ import config
 import sys
 import os
 
+# Executes comprehensive query analysis. 
 def analyze_query(query):
     db = DBConnector(db_path = config.DB_CONFIG["db_path"])
     
@@ -45,9 +49,9 @@ def analyze_query(query):
         db.close()
 
 if __name__ == "__main__":
+    
     # Prompt user for database file path
     user_db_path = input("Please enter the path to your database file:\n").strip().replace('"', '').replace("'", '')
-    print("Exists:", os.path.isfile(user_db_path))
     config.DB_CONFIG["db_path"] = user_db_path
 
     # Take user input for the SQL query

@@ -27,7 +27,7 @@ class DBConnector:
 
     # Returns SQLite's query plan illuminating how SQLite will execute the given query.
     def get_explain(self, query : str): 
-        explain_query = f"EXPLAIN {query}" 
+        explain_query = f"EXPLAIN QUERY PLAN {query}" 
         self.cursor.execute(explain_query) 
         rows = self.cursor.fetchall()
         return [dict(row) for row in rows]
