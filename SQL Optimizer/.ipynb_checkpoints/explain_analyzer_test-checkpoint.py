@@ -130,14 +130,14 @@ class TestCheckFilesort(unittest.TestCase):
     # Flags "USING FILESORT" detail
     def test_detects_filesort_keyword(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USING FILESORT'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USING USING TEMP B-TREE FOR ORDER BY'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_filesort_or_temp()
 
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'Filesort')
-        self.assertIn('FILESORT', analyzer.issues[0]['message'])
+        self.assertIn('USING TEMP B-TREE FOR ORDER BY', analyzer.issues[0]['message'])
 
     # Tests that efficient query plans don't raise any flags.
     def test_no_temp_or_filesort_detected(self):
@@ -153,7 +153,7 @@ class TestCheckFilesort(unittest.TestCase):
     def test_multiple_temp_and_filesort(self):
         explain_plan = [
             {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USING TEMP B-TREE'},
-            {'selectid': 0, 'order': 1, 'from': 1, 'detail': 'USING FILESORT'},
+            {'selectid': 0, 'order': 1, 'from': 1, 'detail': 'USING TEMP B-TREE FOR ORDER BY'},
             {'selectid': 0, 'order': 2, 'from': 2, 'detail': 'USING TEMP TABLE'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
@@ -179,7 +179,7 @@ class TestAnalyzer(unittest.TestCase):
         ]
         self.filesort_temp_plan = [
             {"detail": "USING TEMP B-TREE"},
-            {"detail": "SOME OPERATION USING FILESORT"},
+            {"detail": "SOME OPERATION USING TEMP B-TREE FOR ORDER BY"},
             {"detail": "NO ISSUE HERE"}
         ]
         self.clean_plan = [
@@ -242,7 +242,7 @@ class TestAnalyzer(unittest.TestCase):
     # Tests filesort presence instance. 
     @patch("config.OPTIMIZATION_THRESHOLDS", {"using_filesort_penalty": True})
     def test_filesort_detection_no_sqlite_actual(self):
-        plan = [{"detail": "operation USING FILESORT"}]
+        plan = [{"detail": "operation USING TEMP B-TREE FOR ORDER BY"}]
         analyzer = ExplainAnalyzer(plan)
         result = analyzer.analyze()
         self.assertEqual(result["total_issues"], 1)

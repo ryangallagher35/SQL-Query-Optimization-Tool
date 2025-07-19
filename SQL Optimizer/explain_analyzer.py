@@ -50,20 +50,21 @@ class ExplainAnalyzer:
                     "message": f"No index used in search: '{row['detail']}'"
                 })
 
-    # Heuristically detect potential use of filesort or temp ops
+    # Heuristically detect potential use of filesort or temporary data structures.
     def _check_filesort_or_temp(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "USING TEMP B-TREE" in detail or "USING TEMP TABLE" in detail:
-                self.issues.append({
-                    "type": "Using Temporary Structure",
-                    "message": f"Temporary structure used: '{row['detail']}'"
-                })
-            elif "USING FILESORT" in detail:  # SQLite won't actually say this
+            if "USING TEMP B-TREE FOR ORDER BY" in detail:  
                 self.issues.append({
                     "type": "Filesort",
                     "message": f"Filesort operation detected: '{row['detail']}'"
                 })
+            elif "USING TEMP B-TREE" in detail or "USING TEMP TABLE" in detail:
+                self.issues.append({
+                    "type": "Using Temporary Structure",
+                    "message": f"Temporary structure used: '{row['detail']}'"
+                })
+
 
 
 
