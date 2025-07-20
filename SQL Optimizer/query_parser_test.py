@@ -93,6 +93,7 @@ class TestGetJoins(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(qp.get_joins(), ["INNER JOIN profiles p ON u.id = p.user_id"])
 
+    
     # Test multiple JOIN instances (i.e. INNER, LEFT OUTER). 
     def test_multiple_joins(self):
         query = "SELECT u.id, p.name, l.time FROM users u INNER JOIN profiles p ON u.id = p.user_id LEFT OUTER JOIN logins l ON p.id = l.profile_id;"
@@ -441,6 +442,7 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["conditions"], ["r.name = 'East'"])
 
 # Runs the tests. 
+
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))

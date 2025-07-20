@@ -101,7 +101,6 @@ class QueryParser:
     
         return columns
 
-    
     # Extracts the joins used in the SQL query.
     def get_joins(self): 
         joins = []
@@ -112,52 +111,52 @@ class QueryParser:
             "RIGHT JOIN", "RIGHT OUTER JOIN", "FULL JOIN", 
             "FULL OUTER JOIN", "CROSS JOIN", "NATURAL JOIN"
         }
+
+        stop_keywords = {"WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", ";"}
     
         while idx < len(tokens):
             token = tokens[idx]
             
-            # Detect JOIN keyword
             if token.ttype is Keyword and any(keyword in token.value.upper() for keyword in join_keywords):
-                join_clause = token.value  # Start with the JOIN type (e.g., INNER JOIN, LEFT JOIN, etc.)
-                
+                join_clause = token.value  
                 next_idx = idx + 1
                 while next_idx < len(tokens):
                     next_token = tokens[next_idx]
     
-                    # Skip whitespace tokens
                     if next_token.ttype is Whitespace:
                         next_idx += 1
                         continue
                     
-                    # If the token is an identifier (table name or alias), add it to the JOIN clause
                     if isinstance(next_token, Identifier):
                         join_clause += f" {next_token.value}"
                         next_idx += 1
     
-                    # If the token is a list of identifiers (e.g., a list of tables in a JOIN)
                     elif isinstance(next_token, IdentifierList):
                         for identifier in next_token.get_identifiers():
                             join_clause += f" {identifier.value}"
                         next_idx += 1
     
-                    # If token is ON or USING (start of condition), capture the condition
                     elif next_token.ttype is Keyword and next_token.value.upper() in ["ON", "USING"]:
                         join_clause += f" {next_token.value}"
                         next_idx += 1
                         
-                        # Now we need to capture the condition part of the join (until we hit a non-condition keyword)
                         while next_idx < len(tokens):
                             cond_token = tokens[next_idx]
+                            token_value = cond_token.value.upper().strip() 
+                            token_array = re.findall(r"[\w']+|[^\w\s]", token_value)
+                            stop = False
                             
-                            # Stop if we encounter a keyword that is not part of the ON condition
-                            if cond_token.ttype is Keyword and (cond_token.value.upper() in {"WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", ";"} or cond_token.value.upper() in join_keywords):
+                            for i in range(len(token_array)):
+                                if token_array[i] in stop_keywords: 
+                                    stop = True
+                                    
+                            if stop or token_value in join_keywords:
                                 break
                             
                             join_clause += f"{cond_token.value}"
                             next_idx += 1
-                        break  # Finished this join clause
+                        break  
     
-                    # Stop processing if we encounter something unexpected (i.e., the JOIN clause is complete)
                     else:
                         break
     
@@ -166,7 +165,6 @@ class QueryParser:
             else:
                 idx += 1
     
-        # Clean up any trailing characters
         joins = [join.strip().rstrip(';').rstrip(',') for join in joins]
         
         return joins
