@@ -91,7 +91,7 @@ class TestGetJoins(unittest.TestCase):
     def test_inner_join(self):
         query = "SELECT u.id, p.name FROM users u INNER JOIN profiles p ON u.id = p.user_id;"
         qp = QueryParser(query)
-        self.assertEqual(qp.get_joins(), ["INNER JOIN profiles p"])
+        self.assertEqual(qp.get_joins(), ["INNER JOIN profiles p ON u.id = p.user_id"])
 
     # Test multiple JOIN instances (i.e. INNER, LEFT OUTER). 
     def test_multiple_joins(self):
@@ -104,26 +104,26 @@ class TestGetJoins(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(
             qp.get_joins(), 
-            ["INNER JOIN profiles p", "LEFT OUTER JOIN logins l"]
+            ["INNER JOIN profiles p ON u.id = p.user_id", "LEFT OUTER JOIN logins l ON p.id = l.profile_id"]
         )
 
     # Test mere JOIN instance (no qualifier such INNER/LEFT, etc.). 
     def test_plain_join(self):
         query = "SELECT * FROM a JOIN b ON a.id = b.a_id;"
         qp = QueryParser(query)
-        self.assertEqual(qp.get_joins(), ["JOIN b"])
+        self.assertEqual(qp.get_joins(), ["JOIN b ON a.id = b.a_id"])
 
     # Test alias handling in JOIN clauses. 
     def test_join_with_alias(self):
         query = "SELECT * FROM customer c JOIN orders o ON c.id = o.customer_id;"
         qp = QueryParser(query)
-        self.assertEqual(qp.get_joins(), ["JOIN orders o"])
+        self.assertEqual(qp.get_joins(), ["JOIN orders o ON c.id = o.customer_id"])
 
     # Test case insensitivity.
     def test_case_insensitive_join(self):
         query = "SELECT * FROM users u LeFt JoIn orders o ON u.id = o.user_id;"
         qp = QueryParser(query)
-        self.assertEqual(qp.get_joins(), ["LeFt JoIn orders o"])
+        self.assertEqual(qp.get_joins(), ["LeFt JoIn orders o ON u.id = o.user_id"])
 
     # Test instance where no join appears in query. 
     def test_no_joins(self):
@@ -394,17 +394,12 @@ class TestSummarizeQuery(unittest.TestCase):
 
     # Test summary with all components
     def test_full_summary(self):
-        query = """
-        SELECT u.id, u.name, o.amount 
-        FROM users u 
-        INNER JOIN orders o ON u.id = o.user_id 
-        WHERE o.amount > 100 AND u.status = 'active';
-        """
+        query = "SELECT u.id, u.name, o.amount FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.amount > 100 AND u.status = 'active';"
         qp = QueryParser(query)
         summary = qp.summarize_query()
         self.assertEqual(set(summary["tables"]), {"users", "orders"})
         self.assertEqual(set(summary["columns"]), {"id", "name", "amount"})
-        self.assertEqual(summary["joins"], ["INNER JOIN orders o"])
+        self.assertEqual(summary["joins"], ["INNER JOIN orders o ON u.id = o.user_id"])
         self.assertEqual(
             summary["conditions"], 
             ["o.amount > 100", "AND", "u.status = 'active'"]
@@ -447,7 +442,7 @@ class TestSummarizeQuery(unittest.TestCase):
         summary = qp.summarize_query()
         self.assertEqual(set(summary["tables"]), {"Sales", "Regions"})
         self.assertEqual(summary["columns"], ["*"])
-        self.assertEqual(summary["joins"], ["LeFt JoIn Regions r"])
+        self.assertEqual(summary["joins"], ["LeFt JoIn Regions r On s.region_id = r.id"])
         self.assertEqual(summary["conditions"], ["r.name = 'East'"])
 
 # Runs the tests. 

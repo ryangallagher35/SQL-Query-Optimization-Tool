@@ -101,8 +101,7 @@ class QueryParser:
     
         return columns
 
-
-    # Extracts the joins used in the SQL query. 
+    # Extracts the joins used in the SQL query.
     def get_joins(self):
         joins = []
         tokens = self.parsed.tokens
@@ -110,30 +109,60 @@ class QueryParser:
     
         while idx < len(tokens):
             token = tokens[idx]
-            if token.ttype is sqlparse.tokens.Keyword and "JOIN" in token.value.upper():
-                join_clause = token.value  
-                
+            # Detect JOIN keyword (could be INNER JOIN, LEFT JOIN, etc.)
+            if token.ttype is Keyword and "JOIN" in token.value.upper():
+                join_clause = token.value  # e.g. "LEFT JOIN"
+    
                 next_idx = idx + 1
+                # We'll accumulate tokens for the join clause
                 while next_idx < len(tokens):
                     next_token = tokens[next_idx]
+    
+                    # Skip whitespace tokens
                     if next_token.ttype is Whitespace:
                         next_idx += 1
                         continue
+    
+                    # If token is an identifier (table name or alias)
                     if isinstance(next_token, Identifier):
                         join_clause += f" {next_token.value}"
-                        joins.append(join_clause.strip())
-                    elif isinstance(next_token, IdentifierList):
-                        for identifier in next_token.get_identifiers():
-                            joins.append(f"{token.value} {identifier.value}".strip())
-                    break
+                        next_idx += 1
     
+                    # If token is a list of identifiers (rare in JOIN but possible)
+                    elif isinstance(next_token, IdentifierList):
+                        # Join with all identifiers inside
+                        for identifier in next_token.get_identifiers():
+                            join_clause += f" {identifier.value}"
+                        next_idx += 1
+    
+                    # If token is ON or USING keyword (start of condition)
+                    elif next_token.ttype is Keyword and next_token.value.upper() in ["ON", "USING"]:
+                        join_clause += f" {next_token.value}"
+                        next_idx += 1
+                        # Keep adding tokens to the join clause while they're not a new keyword (like WHERE)
+                        while next_idx < len(tokens):
+                            cond_token = tokens[next_idx]
+                            # Stop if you hit a keyword that's not part of ON condition
+                            #if cond_token.ttype is Keyword and cond_token.value.upper() not in ["AND", "OR", "ON", "USING"]:
+                            if cond_token.ttype is Keyword and cond_token.value.upper() in ["WHERE"]:
+                                break
+                            join_clause += f"{cond_token.value}"
+                            next_idx += 1
+                        break  # Finished with this join clause
+    
+                    else:
+                        # Stop if we hit something that is neither table nor ON/USING clause
+                        break
+    
+                joins.append(join_clause.strip())
                 idx = next_idx
             else:
                 idx += 1
+
+        joins = [join.strip().rstrip(';').rstrip(',') for join in joins]
     
         return joins
 
- 
     # Returns the conditions specified by the WHERE clause.
     def get_conditions(self):
         conditions = []
@@ -302,7 +331,6 @@ class QueryParser:
         # If none matched, return None
         return None
    
-
     # Returns a summary of the key components of the query.
     def summarize_query(self): 
     
