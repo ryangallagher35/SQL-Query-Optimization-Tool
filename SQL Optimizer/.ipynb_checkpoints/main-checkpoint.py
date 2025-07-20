@@ -75,5 +75,11 @@ if __name__ == "__main__":
         print("\nExplain Plan:")
         for row in result["explain_plan"]:
             print(row)
+        print("\nQuery Results:")
+        if result["query_results"]:
+            for row in result["query_results"]:
+                print(row)
+        else:
+            print("No rows returned by the query.")
         
 

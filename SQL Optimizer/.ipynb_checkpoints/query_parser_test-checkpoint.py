@@ -230,6 +230,110 @@ class TestGetOrderBy(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(qp.get_order_by(), [("u.name", "DESC")])
 
+# Testing suite for the get_group_by method.
+class TestGetGroupBy(unittest.TestCase):
+
+    # Test single GROUP BY column.
+    def test_single_group_by(self):
+        query = "SELECT department, COUNT(*) FROM employees GROUP BY department;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["department"])
+
+    # Test multiple GROUP BY columns.
+    def test_multiple_group_by(self):
+        query = "SELECT department, role, COUNT(*) FROM employees GROUP BY department, role;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["department", "role"])
+
+    # Test GROUP BY with aliases.
+    def test_group_by_with_alias(self):
+        query = "SELECT e.department, COUNT(*) FROM employees e GROUP BY e.department;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["e.department"])
+
+    # Test GROUP BY followed by ORDER BY.
+    def test_group_by_with_order_by(self):
+        query = "SELECT category, SUM(price) FROM products GROUP BY category ORDER BY category ASC;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["category"])
+
+    # Test GROUP BY followed by LIMIT.
+    def test_group_by_with_limit(self):
+        query = "SELECT city, COUNT(*) FROM customers GROUP BY city LIMIT 5;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["city"])
+
+    # Test GROUP BY with spacing and case variation.
+    def test_group_by_case_insensitivity(self):
+        query = "select region, sum(sales) from sales_data gRoUp By region;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), ["region"])
+
+    # Test query without GROUP BY should return empty list.
+    def test_no_group_by(self):
+        query = "SELECT * FROM users;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_group_by(), [])
+
+# Testing suite for get_having method.
+class TestGetHaving(unittest.TestCase):
+
+    # Tests a simple single HAVING condition.
+    def test_single_having_condition(self):
+        query = "SELECT department, COUNT(*) FROM employees GROUP BY department HAVING COUNT(*) > 5;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), ["COUNT(*) > 5"])
+
+    # Tests multiple HAVING conditions combined with AND.
+    def test_multiple_having_conditions_and(self):
+        query = """
+        SELECT department, AVG(salary) 
+        FROM employees 
+        GROUP BY department 
+        HAVING AVG(salary) > 50000 AND COUNT(*) > 10;
+        """
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), ["AVG(salary) > 50000", "AND", "COUNT(*) > 10"])
+
+    # Tests multiple HAVING conditions combined with OR.
+    def test_multiple_having_conditions_or(self):
+        query = """
+        SELECT department, SUM(bonus) 
+        FROM employees 
+        GROUP BY department 
+        HAVING SUM(bonus) > 10000 OR COUNT(*) < 5;
+        """
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), ["SUM(bonus) > 10000", "OR", "COUNT(*) < 5"])
+
+    # Tests HAVING clause with complex expressions and parentheses.
+    def test_complex_having_conditions(self):
+        query = """
+        SELECT department, COUNT(*)
+        FROM employees
+        GROUP BY department
+        HAVING (COUNT(*) > 5 AND AVG(salary) < 70000) OR MAX(bonus) > 10000;
+        """
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), ["(COUNT(*) > 5", "AND", "AVG(salary) < 70000)", "OR", "MAX(bonus) > 10000"])
+
+    # Tests HAVING clause case insensitivity.
+    def test_case_insensitive_having(self):
+        query = """
+        SELECT category, SUM(sales)
+        FROM orders
+        GROUP BY category
+        haVinG SUM(sales) > 1000;
+        """
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), ["SUM(sales) > 1000"])
+
+    # Tests no HAVING clause returns empty list.
+    def test_no_having_clause(self):
+        query = "SELECT category FROM orders GROUP BY category;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_having(), [])
+
 # Testing suite for the summarize_query method.
 class TestSummarizeQuery(unittest.TestCase):
 
@@ -291,11 +395,12 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["joins"], ["LeFt JoIn Regions r"])
         self.assertEqual(summary["conditions"], ["r.name = 'East'"])
 
-
 # Runs the tests. 
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetConditions))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetOrderBy))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetGroupBy))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetHaving))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))
