@@ -334,6 +334,61 @@ class TestGetHaving(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(qp.get_having(), [])
 
+# Test suite for get_limit method.
+class TestGetLimit(unittest.TestCase):
+
+    # Test simple LIMIT with a single numeric value
+    def test_simple_limit(self):
+        query = "SELECT * FROM users LIMIT 10;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), 10)
+
+    # Test LIMIT with no number (invalid SQL, should handle gracefully)
+    def test_limit_no_number(self):
+        query = "SELECT * FROM users LIMIT ;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), None)  # Assuming None if invalid or no limit
+
+    # Test no LIMIT clause
+    def test_no_limit(self):
+        query = "SELECT * FROM users;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), None)
+
+    # Test LIMIT with zero
+    def test_limit_zero(self):
+        query = "SELECT * FROM products LIMIT 0;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), 0)
+
+    # Test LIMIT with large numbers
+    def test_large_limit(self):
+        query = "SELECT * FROM logs LIMIT 1000000;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), 1000000)
+
+    # Test LIMIT with whitespace and mixed case keywords
+    def test_limit_case_and_whitespace(self):
+        query = "SELECT * FROM users LiMiT    15 ;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), 15)
+
+    # Test LIMIT with comments inside query
+    def test_limit_with_comment(self):
+        query = """
+        SELECT * FROM users
+        -- Limit the number of results
+        LIMIT 50;
+        """
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), 50)
+
+    # Test LIMIT with parentheses.
+    def test_limit_with_parentheses(self):
+        query = "SELECT * FROM users LIMIT (10);"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_limit(), (10))
+
 # Testing suite for the summarize_query method.
 class TestSummarizeQuery(unittest.TestCase):
 
@@ -403,4 +458,5 @@ unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGe
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetOrderBy))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetGroupBy))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetHaving))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetLimit))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))

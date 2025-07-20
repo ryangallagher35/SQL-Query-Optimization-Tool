@@ -266,6 +266,41 @@ class QueryParser:
                 having_conditions.append(token_strip)
     
         return having_conditions
+
+    # Returns any limit specifications.
+    def get_limit(self):
+        # Remove comments (simple version, strip -- comments)
+        query = re.sub(r'--.*?(\n|$)', ' ', self.query, flags=re.IGNORECASE)
+        # Search for LIMIT clause (case-insensitive)
+        match = re.search(r'\bLIMIT\b\s*([^\s;]+(?:\s*,\s*[^\s;]+)?(?:\s+OFFSET\s+[^\s;]+)?)', query, re.IGNORECASE)
+        if not match:
+            return None
+        limit_clause = match.group(1).strip()
+        # Remove parentheses if any
+        limit_clause = limit_clause.strip('()')
+
+        # Handle LIMIT offset, count
+        if ',' in limit_clause:
+            parts = [p.strip() for p in limit_clause.split(',')]
+            if len(parts) == 2 and all(p.isdigit() for p in parts):
+                offset, count = int(parts[0]), int(parts[1])
+                return (offset, count)
+            else:
+                return None
+
+        # Handle LIMIT count OFFSET offset
+        offset_match = re.match(r'(\d+)\s+OFFSET\s+(\d+)', limit_clause, re.IGNORECASE)
+        if offset_match:
+            count = int(offset_match.group(1))
+            offset = int(offset_match.group(2))
+            return (offset, count)
+
+        # Handle single number limit
+        if limit_clause.isdigit():
+            return int(limit_clause)
+
+        # If none matched, return None
+        return None
    
 
     # Returns a summary of the key components of the query.
@@ -278,7 +313,8 @@ class QueryParser:
             "conditions" : self.get_conditions(), 
             "order_by" : self.get_order_by(), 
             "group_by" : self.get_group_by(), 
-            "having" : self.get_having() 
+            "having" : self.get_having(),
+            "limit" : self.get_limit()
         }
     
     
