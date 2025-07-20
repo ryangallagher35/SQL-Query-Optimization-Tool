@@ -195,7 +195,7 @@ class QueryParser:
         order_by_index = query_upper.find("ORDER BY")
         order_by_clause = self.query[order_by_index + len("ORDER BY"):]
     
-        for end_keyword in ["LIMIT", "OFFSET", "FETCH", "FOR", ";"]:
+        for end_keyword in ["ORDER BY", "LIMIT", "OFFSET", "FETCH", "FOR", "HAVING", ";", "WINDOW", "UNION", "INTERSECT", "EXCEPT", "RETURNING", "WHERE"]:
             end_index = order_by_clause.upper().find(end_keyword)
             if end_index != -1:
                 order_by_clause = order_by_clause[:end_index]
@@ -225,7 +225,7 @@ class QueryParser:
         group_by_clause = self.query[group_by_index + len("GROUP BY"):]
     
         # Stop at the next SQL clause keyword
-        for end_keyword in ["ORDER BY", "LIMIT", "OFFSET", "FETCH", "FOR", ";"]:
+        for end_keyword in ["ORDER BY", "LIMIT", "OFFSET", "FETCH", "FOR", "HAVING", ";","WINDOW", "UNION", "INTERSECT", "EXCEPT", "RETURNING", "WHERE"]:
             end_index = group_by_clause.upper().find(end_keyword)
             if end_index != -1:
                 group_by_clause = group_by_clause[:end_index]
