@@ -4,9 +4,8 @@
 
 # Resource importing and management. 
 import sqlparse 
-from sqlparse.sql import IdentifierList, Identifier 
-from sqlparse.tokens import DML, Keyword, Whitespace, Wildcard
-import re 
+from sqlparse.sql import IdentifierList, Identifier, TokenList
+from sqlparse.tokens import DML, Keyword, Whitespace, Wildcard, Punctuation, Name, Number
 
 # Defines the query parser class and its pertainent methods. 
 class QueryParser: 
@@ -24,7 +23,7 @@ class QueryParser:
         join_keywords = {
             "JOIN", "INNER JOIN", "LEFT JOIN", "LEFT OUTER JOIN",
             "RIGHT JOIN", "RIGHT OUTER JOIN", "FULL JOIN", "FULL OUTER JOIN",
-            "CROSS JOIN", "NATURAL JOIN"
+            "CROSS JOIN", "NATURAL JOIN", "FROM"
         }
     
         parsed = self.parsed
@@ -184,6 +183,40 @@ class QueryParser:
         return conditions
     
 
+    # Extracts ORDER BY conditions, which typically denote the presence of a "filesort" operation.  
+    def get_order_by(self):
+        order_by_columns = []
+        query_upper = self.query.upper()
+        
+        if "ORDER BY" not in query_upper:
+            return []
+    
+        # Get the actual ORDER BY clause portion
+        order_by_index = query_upper.find("ORDER BY")
+        order_by_clause = self.query[order_by_index + len("ORDER BY"):]
+    
+        # Stop at the next SQL clause keyword, if present
+        for end_keyword in ["LIMIT", "OFFSET", "FETCH", "FOR", ";"]:
+            end_index = order_by_clause.upper().find(end_keyword)
+            if end_index != -1:
+                order_by_clause = order_by_clause[:end_index]
+                break
+    
+        # Split by commas for multiple orderings
+        columns = [col.strip() for col in order_by_clause.strip().split(",")]
+    
+        for col in columns:
+            parts = col.split()
+            if len(parts) == 0:
+                continue
+            column_name = parts[0]
+            direction = parts[1].upper() if len(parts) > 1 and parts[1].upper() in ("ASC", "DESC") else "ASC"
+            order_by_columns.append((column_name, direction))
+    
+        return order_by_columns
+
+
+
     # Returns a summary of the key components of the query.
     def summarize_query(self): 
     
@@ -191,8 +224,10 @@ class QueryParser:
             "tables" : self.get_tables(), 
             "columns" : self.get_columns(), 
             "joins" : self.get_joins(), 
-            "conditions" : self.get_conditions() 
+            "conditions" : self.get_conditions(), 
+            "order_by" : self.get_order_by()
         }
+    
     
 
 

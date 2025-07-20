@@ -134,13 +134,13 @@ class TestGetJoins(unittest.TestCase):
 # Testing suite for get_conditions method.
 class TestGetConditions(unittest.TestCase):
 
-    # Test a basic single condition
+    # Test a basic single condition.
     def test_single_condition(self):
         query = "SELECT * FROM users WHERE age > 30;"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["age > 30"])
 
-    # Test multiple conditions with AND
+    # Test multiple conditions with AND.
     def test_multiple_conditions_and(self):
         query = "SELECT * FROM users WHERE age > 30 AND status = 'active';"
         qp = QueryParser(query)
@@ -149,7 +149,7 @@ class TestGetConditions(unittest.TestCase):
             ["age > 30", "AND", "status = 'active'"]
         )
 
-    # Test multiple conditions with OR
+    # Test multiple conditions with OR.
     def test_multiple_conditions_or(self):
         query = "SELECT * FROM users WHERE city = 'New York' OR city = 'Chicago';"
         qp = QueryParser(query)
@@ -158,7 +158,7 @@ class TestGetConditions(unittest.TestCase):
             ["city = 'New York'", "OR", "city = 'Chicago'"]
         )
 
-    # Test parentheses and nested conditions
+    # Test parentheses and nested conditions.
     def test_nested_conditions(self):
         query = "SELECT * FROM users WHERE (age > 30 AND status = 'active') OR role = 'admin';"
         qp = QueryParser(query)
@@ -167,36 +167,68 @@ class TestGetConditions(unittest.TestCase):
             ["(age > 30 AND status = 'active')", "OR", "role = 'admin'"]
         )
 
-    # Test condition with LIKE operator
+    # Test condition with LIKE operator.
     def test_like_condition(self):
         query = "SELECT * FROM users WHERE name LIKE 'R%';"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["name LIKE 'R%'"])
 
-    # Test case insensitivity in WHERE clause
+    # Test case insensitivity in WHERE clause.
     def test_case_insensitive_where(self):
         query = "SELECT * FROM users wHeRe age = 25;"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["age = 25"])
 
-    # Test query with no WHERE clause
+    # Test query with no WHERE clause.
     def test_no_where_clause(self):
         query = "SELECT * FROM users;"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), [])
 
-    # Test WHERE clause using BETWEEN
+    # Test WHERE clause using BETWEEN.
     def test_between_condition(self):
         query = "SELECT * FROM orders WHERE amount BETWEEN 100 AND 500;"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["amount BETWEEN 100 AND 500"])
 
-    # Test WHERE clause using IN
+    # Test WHERE clause using IN.
     def test_in_condition(self):
         query = "SELECT * FROM customers WHERE region IN ('North', 'East');"
         qp = QueryParser(query)
         self.assertEqual(qp.get_conditions(), ["region IN ('North', 'East')"])
 
+# Testing suite for get_order_by method.
+class TestGetOrderBy(unittest.TestCase):
+
+    # Tests ORDER BY functionality when a single column is employed with ASC.
+    def test_single_column_asc(self):
+        query = "SELECT * FROM users ORDER BY name ASC;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_order_by(), [("name", "ASC")])
+
+    # Tests ORDER BY functionality when a single column is employed with DESC.
+    def test_single_column_desc(self):
+        query = "SELECT * FROM users ORDER BY age DESC;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_order_by(), [("age", "DESC")])
+
+    # Tests ORDER BY functionality when multiple columns are given.
+    def test_multiple_columns(self):
+        query = "SELECT * FROM users ORDER BY last_name ASC, first_name DESC;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_order_by(), [("last_name", "ASC"), ("first_name", "DESC")])
+
+    # Tests if the empty set is returned when no "ORDER BY" clause is given,
+    def test_no_order_by(self):
+        query = "SELECT * FROM users;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_order_by(), [])
+
+    # Tests ORDER BY functionality when aliases are employed.
+    def test_order_by_with_alias(self):
+        query = "SELECT u.id, u.name FROM users u ORDER BY u.name DESC;"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_order_by(), [("u.name", "DESC")])
 
 # Testing suite for the summarize_query method.
 class TestSummarizeQuery(unittest.TestCase):
@@ -265,4 +297,5 @@ unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGe
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetConditions))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetOrderBy))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))
