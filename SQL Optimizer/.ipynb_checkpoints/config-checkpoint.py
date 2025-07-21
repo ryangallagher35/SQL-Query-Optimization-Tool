@@ -7,18 +7,28 @@ DB_CONFIG = {
     "db_path" : "your_database.sqlite3"
 } 
 
-# Optimization thresholds defined here. ***(may want to add more)***
+'''
+# Optimization thresholds defined here. 
 OPTIMIZATION_THRESHOLDS = { 
     "full_table_scan" : True,
     "missing_index" : True,
     "using_filesort_penalty" : True, 
-
-    # New features.
-    "unindexed_join": True,              # Detect JOINs on columns without indexes
-    "unnecessary_subquery": True,        # Detect unnecessary/nested subqueries
-    "like_without_index": True,          # Detect LIKE queries that cannot use index
-    "inefficient_or_conditions": True,   # Detect OR conditions that disable indexes
-    "missing_limit": True,                # Detect queries without LIMIT when expected
-    "functions_on_indexed_columns": True,# Detect functions applied on indexed columns in WHERE
-    "order_by_without_index": True     # Detect ORDER BY without index
+    "unindexed_join": True,              
+    "unnecessary_subquery": True,        
+    "like_without_index": True,          
+    "inefficient_or_conditions": True,   
+    "functions_on_indexed_columns": True,
+    "order_by_without_index": True   
+} 
+'''
+OPTIMIZATION_THRESHOLDS = { 
+    "full_table_scan" : False,
+    "missing_index" : False,
+    "using_filesort_penalty" : False, 
+    "unindexed_join": False,              
+    "unnecessary_subquery": False,        
+    "like_without_index": False,          
+    "inefficient_or_conditions": False,   
+    "functions_on_indexed_columns": False,
+    "order_by_without_index": False     
 } 

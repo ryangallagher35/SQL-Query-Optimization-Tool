@@ -38,6 +38,36 @@ class Suggestions:
                     "index columns involved in sorting or limit sorting where possible."
                 )
 
+                        elif issue_type == "Unindexed JOIN":
+                suggestions.append(
+                    "Add indexes to columns used in JOIN conditions to improve performance and reduce scan costs."
+                )
+
+            elif issue_type == "Unnecessary Subquery":
+                suggestions.append(
+                    "Consider flattening nested subqueries or using JOINs where applicable to simplify and speed up the query."
+                )
+
+            elif issue_type == "LIKE without index":
+                suggestions.append(
+                    "Avoid using leading wildcards (e.g., '%value') in LIKE patterns; consider full-text search or redesigning the query."
+                )
+
+            elif issue_type == "Inefficient OR Conditions":
+                suggestions.append(
+                    "Rewrite OR conditions using UNION or ensure each condition benefits from an index to maintain performance."
+                )
+
+            elif issue_type == "Functions on Indexed Columns":
+                suggestions.append(
+                    "Avoid wrapping indexed columns in functions in the WHERE clause; refactor the query to allow index usage."
+                )
+
+            elif issue_type == "ORDER BY without Index":
+                suggestions.append(
+                    "Add indexes to columns used in ORDER BY to avoid temporary table usage and improve sort performance."
+                )
+
             else:
                 suggestions.append(f"No specific suggestion available for issue: {message}")
 
