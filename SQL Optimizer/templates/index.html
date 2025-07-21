@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SQL Query Optimizer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SQL Query Optimizer</h1>
+        <label for="dbPath">Database Path:</label><br>
+        <input id="dbPath" type="text" placeholder="e.g., /path/to/your.db"><br><br>
+
+        <label for="query">SQL Query:</label><br>
+        <textarea id="query" rows="10" cols="80" placeholder="Enter your SQL query here..."></textarea><br><br>
+
+        <button onclick="analyzeQuery()">Analyze</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function analyzeQuery() {
+            const dbPath = document.getElementById("dbPath").value;
+            const query = document.getElementById("query").value;
+
+            const response = await fetch("/analyze", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ db_path: dbPath, query: query })
+            });
+
+            const resultDiv = document.getElementById("results");
+            resultDiv.innerHTML = ""; // Clear previous
+
+            const result = await response.json();
+
+            if (result.error) {
+                resultDiv.innerHTML = `<p style="color:red;">Error: ${result.error}</p>`;
+                return;
+            }
+
+            resultDiv.innerHTML += `<h2>Query Summary</h2><pre>${result.query_summary}</pre>`;
+
+            resultDiv.innerHTML += `<h2>Detected Issues</h2>`;
+            if (result.issues.length > 0) {
+                result.issues.forEach(i => {
+                    resultDiv.innerHTML += `<p><b>${i.type}</b>: ${i.message}</p>`;
+                });
+            } else {
+                resultDiv.innerHTML += "<p>No major issues detected.</p>";
+            }
+
+            resultDiv.innerHTML += `<h2>Suggestions</h2>`;
+            result.suggestions.forEach(s => {
+                resultDiv.innerHTML += `<p>- ${s}</p>`;
+            });
+
+            resultDiv.innerHTML += `<h2>Explain Plan</h2><pre>${JSON.stringify(result.explain_plan, null, 2)}</pre>`;
+
+            resultDiv.innerHTML += `<h2>Query Results</h2>`;
+            if (result.query_results.length > 0) {
+                result.query_results.forEach(r => {
+                    resultDiv.innerHTML += `<pre>${JSON.stringify(r, null, 2)}</pre>`;
+                });
+            } else {
+                resultDiv.innerHTML += "<p>No rows returned.</p>";
+            }
+        }
+    </script>
+</body>
+</html>
