@@ -336,7 +336,17 @@ class QueryParser:
         subqueries = []
         query_str = str(self.parsed)
         subquery_pattern = re.compile(r'\((SELECT.*?)(?=\))', re.IGNORECASE | re.DOTALL)
-        subqueries = subquery_pattern.findall(query_str)
+        #subqueries = subquery_pattern.findall(query_str)
+        subquery = subquery_pattern.findall(query_str)
+        raw_subqueries = subquery_pattern.findall(query_str)
+
+        for raw_subquery in raw_subqueries:
+            cleaned_subquery = raw_subquery.strip()
+            if cleaned_subquery.endswith(')'):
+                cleaned_subquery = cleaned_subquery[:-1].strip()
+    
+            subparser = QueryParser(cleaned_subquery)
+            subqueries.append(subparser.summarize_query())
         
         return subqueries
 
