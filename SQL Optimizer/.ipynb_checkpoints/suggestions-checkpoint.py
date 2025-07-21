@@ -38,7 +38,7 @@ class Suggestions:
                     "index columns involved in sorting or limit sorting where possible."
                 )
 
-                        elif issue_type == "Unindexed JOIN":
+            elif issue_type == "Unindexed JOIN":
                 suggestions.append(
                     "Add indexes to columns used in JOIN conditions to improve performance and reduce scan costs."
                 )

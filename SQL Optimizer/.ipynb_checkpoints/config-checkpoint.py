@@ -7,7 +7,6 @@ DB_CONFIG = {
     "db_path" : "your_database.sqlite3"
 } 
 
-'''
 # Optimization thresholds defined here. 
 OPTIMIZATION_THRESHOLDS = { 
     "full_table_scan" : True,
@@ -20,15 +19,4 @@ OPTIMIZATION_THRESHOLDS = {
     "functions_on_indexed_columns": True,
     "order_by_without_index": True   
 } 
-'''
-OPTIMIZATION_THRESHOLDS = { 
-    "full_table_scan" : False,
-    "missing_index" : False,
-    "using_filesort_penalty" : False, 
-    "unindexed_join": False,              
-    "unnecessary_subquery": False,        
-    "like_without_index": False,          
-    "inefficient_or_conditions": False,   
-    "functions_on_indexed_columns": False,
-    "order_by_without_index": False     
-} 
+

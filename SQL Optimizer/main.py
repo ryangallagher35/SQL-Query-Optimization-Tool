@@ -7,8 +7,8 @@ from db_connector import DBConnector
 from query_parser import QueryParser
 from suggestions import Suggestions
 import config
-import sys
 import os
+import sys
 
 # Executes comprehensive query analysis. 
 def analyze_query(query):
@@ -50,23 +50,16 @@ def analyze_query(query):
 
 if __name__ == "__main__":
     
-    # Prompt user for database file path
     user_db_path = input("Please enter the path to your database file:\n").strip().replace('"', '').replace("'", '')
-
-    # Ensures DB path cannot be empty. 
+    
     if not user_db_path:
         print("Error: Database file path cannot be empty. Please provide a valid path.")
         sys.exit(1)  
          
     config.DB_CONFIG["db_path"] = user_db_path
-
-    # Take user input for the SQL query
     input_query = input("Enter your SQL query to analyze:\n")
-    
-    # Analyze the user input query
     result = analyze_query(input_query)
     
-    # Display the results
     if "error" in result:
         print(f"Error analyzing query: {result['error']}")
     else:
