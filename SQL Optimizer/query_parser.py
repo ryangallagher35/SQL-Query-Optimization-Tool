@@ -364,7 +364,7 @@ class QueryParser:
             "group_by" : self.get_group_by(), 
             "having" : self.get_having(),
             "limit" : self.get_limit(), 
-            "subqueries" : self.get_parsed_subqueries()
+            "subqueries" : self.get_subqueries()
         }
 
         return summary
