@@ -385,6 +385,82 @@ class TestGetLimit(unittest.TestCase):
         qp = QueryParser(query)
         self.assertEqual(qp.get_limit(), (10))
 
+
+# Testing suite for the get_subqueries method.
+class TestGetSubqueries(unittest.TestCase):
+
+    # Test get_subqueries for identifying and extracting a simple subquery.
+    def test_subquery_extraction(self):
+        query = "SELECT id FROM users WHERE id IN (SELECT user_id FROM orders WHERE amount > 100);"
+        qp = QueryParser(query)
+        self.assertEqual(qp.get_subqueries(), ['SELECT user_id FROM orders WHERE amount > 100'])
+
+   # Test multiple subqueries in the same query.
+    def test_multiple_subqueries(self):
+        query = """
+        SELECT * FROM products WHERE product_id IN 
+            (SELECT product_id FROM sales WHERE amount > 100) 
+            AND category_id IN 
+            (SELECT category_id FROM categories WHERE name = 'Electronics');
+        """
+        qp = QueryParser(query)
+        self.assertEqual(
+            qp.get_subqueries(),
+            [
+                'SELECT product_id FROM sales WHERE amount > 100',
+                'SELECT category_id FROM categories WHERE name = \'Electronics\''
+            ]
+        )
+
+    # Test subquery with aggregation function (e.g., COUNT).
+    def test_subquery_with_aggregation(self):
+        query = """
+        SELECT employee_id, name FROM employees 
+        WHERE department_id IN (SELECT department_id FROM departments WHERE employee_count > 50);
+        """
+        qp = QueryParser(query)
+        self.assertEqual(
+            qp.get_subqueries(),
+            ['SELECT department_id FROM departments WHERE employee_count > 50']
+        )
+
+    # Test subquery with multiple conditions.
+    def test_subquery_with_multiple_conditions(self):
+        query = """
+        SELECT * FROM employees WHERE department_id IN 
+            (SELECT department_id FROM departments WHERE location = 'New York' AND budget > 100000);
+        """
+        qp = QueryParser(query)
+        self.assertEqual(
+            qp.get_subqueries(),
+            ['SELECT department_id FROM departments WHERE location = \'New York\' AND budget > 100000']
+        )
+
+    # Test subquery with LIMIT clause.
+    def test_subquery_with_limit(self):
+        query = """
+        SELECT employee_id FROM employees WHERE department_id IN 
+            (SELECT department_id FROM departments ORDER BY budget DESC LIMIT 1);
+        """
+        qp = QueryParser(query)
+        self.assertEqual(
+            qp.get_subqueries(),
+            ['SELECT department_id FROM departments ORDER BY budget DESC LIMIT 1']
+        )
+
+    # Test subquery with NOT IN clause.
+    def test_subquery_with_not_in(self):
+        query = """
+        SELECT employee_id, name FROM employees WHERE department_id NOT IN 
+            (SELECT department_id FROM departments WHERE location = 'New York');
+        """
+        qp = QueryParser(query)
+        self.assertEqual(
+            qp.get_subqueries(),
+            ['SELECT department_id FROM departments WHERE location = \'New York\'']
+        )
+
+
 # Testing suite for the summarize_query method.
 class TestSummarizeQuery(unittest.TestCase):
 
@@ -441,8 +517,66 @@ class TestSummarizeQuery(unittest.TestCase):
         self.assertEqual(summary["joins"], ["LeFt JoIn Regions r On s.region_id = r.id"])
         self.assertEqual(summary["conditions"], ["r.name = 'East'"])
 
-# Runs the tests. 
+# Tests summaries with more advanced queries.
+class TestSummarizeQueryAdvanced(unittest.TestCase):
 
+    def test_group_by(self):
+        query = "SELECT name, age FROM employees GROUP BY name"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['group_by'], ['name'])
+
+        query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['group_by'], ['department'])
+        self.assertEqual(summary['having'], ['count(*) > 10'])
+
+    def test_order_by(self):
+        query = "SELECT name, age FROM employees ORDER BY age DESC"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['order_by'], [('age', 'DESC')])
+
+        query = "SELECT name, salary FROM employees ORDER BY salary ASC, name DESC"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['order_by'], [('salary', 'ASC'), ('name', 'DESC')])
+
+    def test_having(self):
+        query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['having'], ['count(*) > 10'])
+
+        query = "SELECT department, sum(salary) FROM employees GROUP BY department HAVING sum(salary) > 50000 OR count(*) < 5"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['having'], ['sum(salary) > 50000', 'OR', 'count(*) < 5'])
+
+    def test_limit(self):
+        query = "SELECT name FROM employees LIMIT 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['limit'], 10)
+
+        query = "SELECT name FROM employees LIMIT 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['limit'], 10)
+
+        query = "SELECT * FROM employees LIMIT 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(summary['limit'], 10)
+
+    def test_complex_query(self):
+        query = "SELECT name, salary FROM employees JOIN departments ON employees.department_id = departments.id WHERE salary > 50000 GROUP BY department HAVING count(*) > 5 ORDER BY salary DESC LIMIT 10"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+
+
+# Runs the tests. 
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))
@@ -451,4 +585,6 @@ unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGe
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetGroupBy))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetHaving))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetLimit))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetSubqueries))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))
+unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQueryAdvanced))
