@@ -335,22 +335,38 @@ class QueryParser:
     def get_subqueries(self):
         subqueries = []
         query_str = str(self.parsed)
-        subquery_pattern = re.compile(r'\((SELECT.*?)(?=\))', re.IGNORECASE | re.DOTALL)
-        #subqueries = subquery_pattern.findall(query_str)
-        subquery = subquery_pattern.findall(query_str)
-        raw_subqueries = subquery_pattern.findall(query_str)
 
-        for raw_subquery in raw_subqueries:
-            cleaned_subquery = raw_subquery.strip()
-            if cleaned_subquery.endswith(')'):
-                cleaned_subquery = cleaned_subquery[:-1].strip()
+        def extract_subqueries(sql):
+            subqueries_found = []
+            stack = []
+            start_idx = None
     
-            subparser = QueryParser(cleaned_subquery)
+            for i, char in enumerate(sql):
+                if char == '(':
+                    if start_idx is None:
+                        lookahead = sql[i+1:i+7].strip().upper()
+                        if lookahead.startswith('SELECT'):
+                            start_idx = i
+                    stack.append(char)
+                elif char == ')':
+                    if stack:
+                        stack.pop()
+                        if not stack and start_idx is not None:
+                            subquery = sql[start_idx + 1:i]  
+                            subqueries_found.append(subquery.strip())
+                            subqueries_found.extend(extract_subqueries(subquery.strip()))
+                            start_idx = None
+            return subqueries_found
+
+        raw_subqueries = extract_subqueries(query_str)
+    
+        for raw in raw_subqueries:
+            subparser = QueryParser(raw)
             subqueries.append(subparser.summarize_query())
-        
+    
         return subqueries
 
-         
+       
     # Returns a summary of the key components of the query.
     def summarize_query(self): 
     

@@ -515,10 +515,43 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         self.assertIn('departments', subquery_summary['tables'])
         self.assertTrue(any("location = 'NY'" in cond for cond in subquery_summary['conditions']))
 
+    def test_subquery_with_joins(self):
+        query = """
+            SELECT name 
+            FROM employees 
+            WHERE department_id IN (SELECT d.id FROM departments d JOIN locations l ON d.location_id = l.id WHERE l.region = 'West')
+        """
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(len(summary['subqueries']), 1)
+        subquery_summary = summary['subqueries'][0]
+        self.assertIn('tables', subquery_summary)
+        self.assertIn('departments', subquery_summary['tables'])
+        self.assertIn('locations', subquery_summary['tables'])
+        self.assertIn('joins', subquery_summary)
+        self.assertTrue(any('JOIN' in join for join in subquery_summary['joins']))
+        self.assertIn('conditions', subquery_summary)
+        self.assertTrue(any("region = 'West'" in cond for cond in subquery_summary['conditions']))
 
+    
+    def test_nested_subqueries(self):
+        query = "SELECT name FROM employees WHERE department_id IN (SELECT department_id FROM projects WHERE project_id IN (SELECT project_id FROM budgets WHERE amount > 100000))"
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
+        self.assertEqual(len(summary['subqueries']), 2)
+        first_level_subquery = summary['subqueries'][0]
+        self.assertIn('tables', first_level_subquery)
+        self.assertIn('projects', first_level_subquery['tables'])
+        nested_subqueries = first_level_subquery.get('subqueries', [])
+        self.assertEqual(len(nested_subqueries), 1)
+        nested_subquery = nested_subqueries[0]
+        self.assertIn('tables', nested_subquery)
+        self.assertIn('budgets', nested_subquery['tables'])
+        self.assertIn('conditions', nested_subquery)
+        self.assertTrue(any('amount > 100000' in cond for cond in nested_subquery['conditions']))
+        
 
 # Runs the tests. 
-'''
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))
@@ -527,7 +560,5 @@ unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGe
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetGroupBy))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetHaving))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetLimit))
-unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetSubqueries))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))
-'''
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQueryAdvanced))
