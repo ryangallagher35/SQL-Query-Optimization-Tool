@@ -52,6 +52,12 @@ if __name__ == "__main__":
     
     # Prompt user for database file path
     user_db_path = input("Please enter the path to your database file:\n").strip().replace('"', '').replace("'", '')
+
+    # Ensures DB path cannot be empty. 
+    if not user_db_path:
+        print("Error: Database file path cannot be empty. Please provide a valid path.")
+        sys.exit(1)  
+         
     config.DB_CONFIG["db_path"] = user_db_path
 
     # Take user input for the SQL query

@@ -340,18 +340,7 @@ class QueryParser:
         
         return subqueries
 
-    # Returns parsed subqueries
-    def get_parsed_subqueries(self):
-        subqueries = self.get_subqueries()
-        parsed_subqueries = []
-
-        for subquery in subqueries:
-            subquery_parser = QueryParser(subquery)  
-            parsed_subqueries.append(subquery_parser.summarize_query())  
-
-        return parsed_subqueries
          
-
     # Returns a summary of the key components of the query.
     def summarize_query(self): 
     
