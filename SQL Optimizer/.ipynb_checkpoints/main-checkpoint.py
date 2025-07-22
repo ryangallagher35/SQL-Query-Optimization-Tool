@@ -3,6 +3,7 @@
 # main.py
 
 # Resource importing and management. 
+from flask import Flask, render_template, request, jsonify
 from db_connector import DBConnector
 from query_parser import QueryParser
 from suggestions import Suggestions
@@ -10,14 +11,15 @@ import config
 import os
 import sys
 
-# Executes comprehensive query analysis. 
-def analyze_query(query):
-    db = DBConnector(db_path = config.DB_CONFIG["db_path"])
-    
+app = Flask(__name__)
+
+def analyze_query(query, db_path):
+    db = DBConnector(db_path=db_path)
+
     try:
         query_results = db.execute_query(query)
         explain_rows = db.get_explain(query)
-        
+
         issues_detected = []
         for row in explain_rows:
             detail = row.get('detail', '').lower() if 'detail' in row else ''
@@ -27,58 +29,58 @@ def analyze_query(query):
                 issues_detected.append({"type": "Filesort", "message": detail})
             if 'temporary' in detail:
                 issues_detected.append({"type": "Using Temporary Structure", "message": detail})
-        
+
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        
+
         suggester = Suggestions(issues_detected)
         suggestions = suggester.generate_suggestions()
-        
+
         return {
             "query_summary": summary,
             "issues": issues_detected,
             "suggestions": suggestions,
-            "explain_plan": explain_rows, 
-            "query_results" : query_results
+            "explain_plan": explain_rows,
+            "query_results": query_results
         }
-        
+
     except Exception as e:
         return {"error": str(e)}
-    
     finally:
         db.close()
 
-if __name__ == "__main__":
-    
-    user_db_path = input("Please enter the path to your database file:\n").strip().replace('"', '').replace("'", '')
-    
-    if not user_db_path:
-        print("Error: Database file path cannot be empty. Please provide a valid path.")
-        sys.exit(1)  
-         
-    config.DB_CONFIG["db_path"] = user_db_path
-    input_query = input("Enter your SQL query to analyze:\n")
-    result = analyze_query(input_query)
-    
-    if "error" in result:
-        print(f"Error analyzing query: {result['error']}")
-    else:
-        print("\nQuery Summary:")
-        print(result["query_summary"])
-        print("\nDetected Issues:")
-        for issue in result["issues"]:
-            print(f"- {issue['type']}: {issue['message']}")
-        print("\nSuggestions:")
-        for suggestion in result["suggestions"]:
-            print(f"- {suggestion}")
-        print("\nExplain Plan:")
-        for row in result["explain_plan"]:
-            print(row)
-        print("\nQuery Results:")
-        if result["query_results"]:
-            for row in result["query_results"]:
-                print(row)
-        else:
-            print("No rows returned by the query.")
-        
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.get_json()
+    raw_path = data.get('db_path', '').strip()
+    query = data.get('query', '').strip()
+
+    # Normalize and validate database path
+    db_path = os.path.normpath(raw_path)
+
+    if not db_path:
+        return jsonify({"error": "Database path is required."}), 400
+    if not os.path.exists(db_path):
+        return jsonify({"error": f"Database file not found at path: {db_path}"}), 400
+    if not query:
+        return jsonify({"error": "SQL query is required."}), 400
+
+    # Update global config path (if needed by db_connector)
+    config.DB_CONFIG["db_path"] = db_path
+
+    result = analyze_query(query, db_path)
+    return jsonify(result)
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+      
 
