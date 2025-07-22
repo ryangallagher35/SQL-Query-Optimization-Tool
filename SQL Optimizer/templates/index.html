@@ -40,7 +40,7 @@
                 return;
             }
 
-            resultDiv.innerHTML += `<h2>Query Summary</h2><pre>${result.query_summary}</pre>`;
+            resultDiv.innerHTML += `<h2>Query Summary</h2><pre>${JSON.stringify(result.query_summary, null, 2)}</pre>`;
 
             resultDiv.innerHTML += `<h2>Detected Issues</h2>`;
             if (result.issues.length > 0) {

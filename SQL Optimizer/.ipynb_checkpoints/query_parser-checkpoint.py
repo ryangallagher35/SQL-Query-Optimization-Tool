@@ -382,7 +382,8 @@ class QueryParser:
             "subqueries" : self.get_subqueries()
         }
 
-        return summary
+        
+
     
     
 

@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify
 from db_connector import DBConnector
 from query_parser import QueryParser
 from suggestions import Suggestions
+from explain_analyzer import ExplainAnalyzer
 import config
 import os
 import sys
@@ -20,15 +21,12 @@ def analyze_query(query, db_path):
         query_results = db.execute_query(query)
         explain_rows = db.get_explain(query)
 
-        issues_detected = []
-        for row in explain_rows:
-            detail = row.get('detail', '').lower() if 'detail' in row else ''
-            if 'scan' in detail and 'index' not in detail:
-                issues_detected.append({"type": "Full Table Scan", "message": detail})
-            if 'using filesort' in detail:
-                issues_detected.append({"type": "Filesort", "message": detail})
-            if 'temporary' in detail:
-                issues_detected.append({"type": "Using Temporary Structure", "message": detail})
+        analyzer = ExplainAnalyzer(explain_rows, raw_query=query)
+        analysis_result = analyzer.analyze()
+        issues_detected = analysis_result.get("issues_detected", [])
+
+        parser = QueryParser(query)
+        summary = parser.summarize_query()
 
         parser = QueryParser(query)
         summary = parser.summarize_query()
@@ -61,7 +59,6 @@ def analyze():
     raw_path = data.get('db_path', '').strip()
     query = data.get('query', '').strip()
 
-    # Normalize and validate database path
     db_path = os.path.normpath(raw_path)
 
     if not db_path:
@@ -71,7 +68,6 @@ def analyze():
     if not query:
         return jsonify({"error": "SQL query is required."}), 400
 
-    # Update global config path (if needed by db_connector)
     config.DB_CONFIG["db_path"] = db_path
 
     result = analyze_query(query, db_path)
@@ -79,7 +75,7 @@ def analyze():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug = True)
 
 
       
