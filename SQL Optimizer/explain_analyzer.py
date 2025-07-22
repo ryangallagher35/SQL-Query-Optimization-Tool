@@ -39,9 +39,6 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("inefficient_or_conditions"):
             self._check_inefficient_or_conditions()
 
-        if OPTIMIZATION_THRESHOLDS.get("missing_limit"):
-            self._check_missing_limit()
-
         if OPTIMIZATION_THRESHOLDS.get("functions_on_indexed_columns"):
             self._check_functions_on_indexed_columns()
 

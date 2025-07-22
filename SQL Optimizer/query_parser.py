@@ -377,8 +377,7 @@ class QueryParser:
             "conditions" : self.get_conditions(), 
             "order_by" : self.get_order_by(), 
             "group_by" : self.get_group_by(), 
-            "having" : self.get_having(),
-            "limit" : self.get_limit(), 
+            "having" : self.get_having(), 
             "subqueries" : self.get_subqueries()
         }
 
