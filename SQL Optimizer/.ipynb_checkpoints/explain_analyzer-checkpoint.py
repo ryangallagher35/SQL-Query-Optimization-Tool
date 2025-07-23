@@ -4,15 +4,17 @@
 
 # Resource importing and management
 from config import OPTIMIZATION_THRESHOLDS
+from query_parser import QueryParser
 import re
 
 # Analyzes output from get_explain and flags inefficiencies based on thresholds confined in config.py.
 class ExplainAnalyzer:
 
     # Initializes the explain output from SQLite as input.
-    def __init__(self, explain_plan, raw_query = ""):
+    def __init__(self, explain_plan, raw_query = "", schema_index_info = None):
         self.explain_plan = explain_plan
         self.raw_query = raw_query.upper() 
+        self.schema_index_info = schema_index_info or {}
         self.issues = []
 
     # Main analysis method that runs all checks based on OPTIMIZATION_THRESHOLDS from config.py
@@ -20,13 +22,9 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("full_table_scan"):
             self._check_full_table_scan()
 
-        if OPTIMIZATION_THRESHOLDS.get("missing_index"):
-            self._check_missing_index()
+        if OPTIMIZATION_THRESHOLDS.get("unnecessary_filesort"):
+            self._check_unnecessary_filesort() 
 
-        if OPTIMIZATION_THRESHOLDS.get("using_filesort_penalty"):
-            self._check_filesort_or_temp()
-
-        # New features.
         if OPTIMIZATION_THRESHOLDS.get("unindexed_join"):
             self._check_unindexed_join()
 
@@ -42,9 +40,6 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("functions_on_indexed_columns"):
             self._check_functions_on_indexed_columns()
 
-        if OPTIMIZATION_THRESHOLDS.get("order_by_without_index"):
-            self._check_order_by_without_index()
-
         return {
             "issues_detected": self.issues,
             "total_issues": len(self.issues)
@@ -54,37 +49,50 @@ class ExplainAnalyzer:
     def _check_full_table_scan(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "SCAN" in detail and "INDEX" not in detail:
+            if "SCAN TABLE" in detail and "INDEX" not in detail:
                 self.issues.append({
                     "type": "Full Table Scan",
                     "message": f"Query performs full scan: '{row['detail']}'"
                 })
             
-
-    # Detects if an index was not used where expected
-    def _check_missing_index(self):
-        for row in self.explain_plan:
-            detail = row.get("detail", "").upper()
-            if "SEARCH" in detail and "INDEX" not in detail:
-                self.issues.append({
-                    "type": "Missing Index",
-                    "message": f"No index used in search: '{row['detail']}'"
-                })
-
     # Heuristically detect potential use of filesort or temporary data structures.
-    def _check_filesort_or_temp(self):
+    def _check_unnecessary_filesort(self):
+        parser = QueryParser(self.raw_query)
+        order_by_cols = parser.get_order_by_columns()
+        tables = parser.get_tables()
+
+        if not order_by_cols or not tables:
+            return  
+
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "USING TEMP B-TREE FOR ORDER BY" in detail:  
-                self.issues.append({
-                    "type": "Filesort",
-                    "message": f"Filesort operation detected: '{row['detail']}'"
-                })
-            elif "USING TEMP B-TREE" in detail or "USING TEMP TABLE" in detail:
-                self.issues.append({
-                    "type": "Using Temporary Structure",
-                    "message": f"Temporary structure used: '{row['detail']}'"
-                })
+            if "USING TEMP B-TREE FOR ORDER BY" in detail:
+        
+                table_name = None
+                if "TABLE" in detail:
+                    parts = detail.split("TABLE")
+                    if len(parts) > 1:
+                        table_name = parts[1].split()[0].strip()
+
+                if not table_name and len(tables) == 1:
+                    table_name = tables[0].upper()
+
+                if not table_name:
+                    continue
+
+                index_info = self.schema_index_info.get(table_name.upper(), {})
+                if self._order_by_covered_by_index(order_by_cols, index_info):
+                    self.issues.append({
+                        "type": "Unnecessary Filesort",
+                        "message": f"Temp B-tree used for ORDER BY on '{table_name}', but ORDER BY columns appear to be index-covered: '{row['detail']}'"
+                    })
+
+    # Checks if the columns used in an ORDER BY clause are covered by any existing index, in correct order.
+    def _order_by_covered_by_index(self, order_by_cols, index_dict):
+        for indexed_cols in index_dict.values():
+            if [col.upper() for col in indexed_cols[:len(order_by_cols)]] == order_by_cols:
+                return True
+        return False
 
     # Detects unindexed JOIN in detail.
     def _check_unindexed_join(self):
@@ -96,7 +104,7 @@ class ExplainAnalyzer:
                         "message": f"JOIN or table scan without index: '{row['detail']}'"
                     })
                     
-    # Detects possible unecessary subqeuries in SELECT statements.
+    # Detects unecessary subqeuries in SELECT statements.
     def _check_unnecessary_subquery(self):
         if "SUBQUERY" in " ".join(r.get("detail", "").upper() for r in self.explain_plan) or \
            "SELECT" in self.raw_query and "SELECT" in self.raw_query[self.raw_query.find("SELECT") + 1:]:
@@ -139,17 +147,4 @@ class ExplainAnalyzer:
                 "type": "Functions on Indexed Columns",
                 "message": f"Functions used in WHERE clause may disable index usage: {func_calls}"
             })
-
-    # Checks if ORDER BY is present but plan shows temp table or no index usage.
-    def _check_order_by_without_index(self):
-        if "ORDER BY" in self.raw_query:
-            temp_usage = any("USING TEMP" in r.get("detail", "").upper() for r in self.explain_plan)
-            if temp_usage:
-                self.issues.append({
-                    "type": "ORDER BY without Index",
-                    "message": "ORDER BY causes temporary table usage, index might be missing."
-                })
-
-     
-
 

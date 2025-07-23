@@ -23,18 +23,7 @@ class Suggestions:
                     "to avoid full table scans."
                 )
 
-            elif issue_type == "Missing Index":
-                suggestions.append(
-                    "Create indexes on columns involved in search conditions to speed up data retrieval."
-                )
-
-            elif issue_type == "Using Temporary Structure":
-                suggestions.append(
-                    "Optimize query to reduce the need for temporary tables or sorting operations; "
-                    "consider rewriting joins or adding indexes."
-                )
-
-            elif issue_type == "Filesort":
+            elif issue_type == "Unnecessary Filesort":
                 suggestions.append(
                     "Avoid ORDER BY operations that require filesort; "
                     "index columns involved in sorting or limit sorting where possible."
@@ -65,10 +54,6 @@ class Suggestions:
                     "Avoid wrapping indexed columns in functions in the WHERE clause; refactor the query to allow index usage."
                 )
 
-            elif issue_type == "ORDER BY without Index":
-                suggestions.append(
-                    "Add indexes to columns used in ORDER BY to avoid temporary table usage and improve sort performance."
-                )
 
             else:
                 suggestions.append(f"No specific suggestion available for issue: {message}")

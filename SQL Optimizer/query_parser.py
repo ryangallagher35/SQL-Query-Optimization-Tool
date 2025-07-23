@@ -15,7 +15,7 @@ class QueryParser:
     def __init__(self, query : str): 
         self.query = query 
         self.parsed = sqlparse.parse(query)[0]
-
+    
     # Extracts the tables in the SQL query.
     def get_tables(self):
         tables = []
@@ -66,7 +66,7 @@ class QueryParser:
             i += 1
     
         return tables
-
+    
     # Extracts the column names used in the SQL query. 
     def get_columns(self):
         columns = []
@@ -106,7 +106,7 @@ class QueryParser:
                     columns.append('*')
     
         return columns
-
+    
     # Extracts the joins used in the SQL query.
     def get_joins(self): 
         joins = []
@@ -117,7 +117,7 @@ class QueryParser:
             "RIGHT JOIN", "RIGHT OUTER JOIN", "FULL JOIN", 
             "FULL OUTER JOIN", "CROSS JOIN", "NATURAL JOIN"
         }
-
+    
         stop_keywords = {"WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", ";"}
     
         while idx < len(tokens):
@@ -174,8 +174,8 @@ class QueryParser:
         joins = [join.strip().rstrip(';').rstrip(',') for join in joins]
         
         return joins
-
-
+    
+    
     # Returns the conditions specified by the WHERE clause.
     def get_conditions(self):
         conditions = []
@@ -196,12 +196,12 @@ class QueryParser:
                         continue
     
                     val = subtoken.value
-
+    
                     if val.upper() == "BETWEEN":
                         inside_between = True
                         current_condition += "BETWEEN"
                         continue
-
+    
                     if inside_between and val.upper() == "AND":
                         current_condition += "AND"
                         continue
@@ -225,7 +225,7 @@ class QueryParser:
     
         return conditions
     
-
+    
     # Extracts ORDER BY conditions, which typically denote the presence of a "filesort" operation.  
     def get_order_by(self):
         order_by_columns = []
@@ -254,7 +254,36 @@ class QueryParser:
             order_by_columns.append((column_name, direction))
     
         return order_by_columns
-
+    
+    # Extracts only the ORDER BY columns used in the SQL query. (Used to detect filesort inefficiencies in explain_analyzer). 
+    def get_order_by_columns(self):
+        order_by_cols = []
+        order_by_seen = False
+    
+        for token in self.parsed.tokens:
+            if token.ttype is Keyword and token.value.upper() == "ORDER BY":
+                order_by_seen = True
+                continue
+    
+            if order_by_seen:
+                if isinstance(token, IdentifierList):
+                    for identifier in token.get_identifiers():
+                        col_name = identifier.get_real_name()
+                        if col_name:
+                            order_by_cols.append(col_name.upper())
+                    break
+                elif isinstance(token, Identifier):
+                    col_name = token.get_real_name()
+                    if col_name:
+                        order_by_cols.append(col_name.upper())
+                    break
+                elif token.ttype in (Whitespace, Punctuation):
+                    continue
+                else:
+                    break
+    
+        return order_by_cols
+    
     # Extracts GROUP BY columns from the SQL query.
     def get_group_by(self):
         group_by_columns = []
@@ -271,7 +300,7 @@ class QueryParser:
             if end_index != -1:
                 group_by_clause = group_by_clause[:end_index]
                 break
-
+    
         group_by_clause = group_by_clause.split('HAVING')[0]
         columns = [col.strip() for col in group_by_clause.strip().split(",")]
     
@@ -280,7 +309,7 @@ class QueryParser:
                 group_by_columns.append(col)
     
         return group_by_columns
-
+    
     # Returns the conditions specified by the HAVING clause.
     def get_having(self):
         having_conditions = []
@@ -299,7 +328,7 @@ class QueryParser:
                 break
     
         tokens = re.split(r'\s+(AND|OR)\s+', having_clause, flags=re.IGNORECASE)
-
+    
         for token in tokens:
             token_strip = token.strip()
             if token_strip.upper() in ("AND", "OR"):
@@ -308,7 +337,7 @@ class QueryParser:
                 having_conditions.append(token_strip)
     
         return having_conditions
-
+    
     # Returns any limit specifications.
     def get_limit(self):
         query = re.sub(r'--.*?(\n|$)', ' ', self.query, flags=re.IGNORECASE)
@@ -317,7 +346,7 @@ class QueryParser:
             return None
         limit_clause = match.group(1).strip()
         limit_clause = limit_clause.strip('()')
-
+    
         if ',' in limit_clause:
             parts = [p.strip() for p in limit_clause.split(',')]
             if len(parts) == 2 and all(p.isdigit() for p in parts):
@@ -325,23 +354,23 @@ class QueryParser:
                 return (offset, count)
             else:
                 return None
-
+    
         offset_match = re.match(r'(\d+)\s+OFFSET\s+(\d+)', limit_clause, re.IGNORECASE)
         if offset_match:
             count = int(offset_match.group(1))
             offset = int(offset_match.group(2))
             return (offset, count)
-
+    
         if limit_clause.isdigit():
             return int(limit_clause)
-
+    
         return None
-
+    
     # Handles parsing subqueries.
     def get_subqueries(self):
         subqueries = []
         query_str = str(self.parsed)
-
+    
         def extract_subqueries(sql):
             subqueries_found = []
             stack = []
@@ -363,7 +392,7 @@ class QueryParser:
                             subqueries_found.extend(extract_subqueries(subquery.strip()))
                             start_idx = None
             return subqueries_found
-
+    
         raw_subqueries = extract_subqueries(query_str)
     
         for raw in raw_subqueries:
@@ -371,7 +400,7 @@ class QueryParser:
             subqueries.append(subparser.summarize_query())
     
         return subqueries
-
+    
        
     # Returns a summary of the key components of the query.
     def summarize_query(self): 
