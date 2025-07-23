@@ -5,9 +5,11 @@
  # Constructs a list of dicts describing detected query inefficiencies from ExplainAnalyzer.
 class Suggestions:
 
+    # Initializes issues_detected.
     def __init__(self, issues_detected):
         self.issues = issues_detected
 
+    # Constructs a set of suggestions to improve the efficiency of the user's query based on the flagged issue type.
     def generate_suggestions(self):
         suggestions = []
 
@@ -43,7 +45,7 @@ class Suggestions:
                     "Add indexes to columns used in JOIN conditions to improve performance and reduce scan costs."
                 )
 
-            elif issue_type == "Unnecessary Subquery":
+            elif issue_type == "Unnecessary subquery":
                 suggestions.append(
                     "Consider flattening nested subqueries or using JOINs where applicable to simplify and speed up the query."
                 )

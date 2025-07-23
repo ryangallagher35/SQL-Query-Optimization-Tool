@@ -39,9 +39,6 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("inefficient_or_conditions"):
             self._check_inefficient_or_conditions()
 
-        if OPTIMIZATION_THRESHOLDS.get("missing_limit"):
-            self._check_missing_limit()
-
         if OPTIMIZATION_THRESHOLDS.get("functions_on_indexed_columns"):
             self._check_functions_on_indexed_columns()
 
@@ -102,7 +99,7 @@ class ExplainAnalyzer:
     # Detects possible unecessary subqeuries in SELECT statements.
     def _check_unnecessary_subquery(self):
         if "SUBQUERY" in " ".join(r.get("detail", "").upper() for r in self.explain_plan) or \
-           "SELECT" in self.raw_query and "SELECT" in self.raw_query[self.raw_query.find("SELECT")+1:]:
+           "SELECT" in self.raw_query and "SELECT" in self.raw_query[self.raw_query.find("SELECT") + 1:]:
             self.issues.append({
                 "type": "Unnecessary Subquery",
                 "message": "Query contains nested subqueries which may be optimized."
@@ -111,7 +108,6 @@ class ExplainAnalyzer:
     # Detects if raw_query has LIKE with leading % and no index used.
     def _check_like_without_index(self):
         if "LIKE" in self.raw_query:
-            import re
             like_patterns = re.findall(r"LIKE\s+'(.*?)'", self.raw_query)
             for pattern in like_patterns:
                 if pattern.startswith("%"):

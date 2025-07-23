@@ -445,18 +445,19 @@ class TestSummarizeQuery(unittest.TestCase):
 # Tests summaries with more advanced queries.
 class TestSummarizeQueryAdvanced(unittest.TestCase):
 
+    # Tests summary involving GROUP BY clause presence.
     def test_group_by(self):
         query = "SELECT name, age FROM employees GROUP BY name"
         parser = QueryParser(query)
         summary = parser.summarize_query()
         self.assertEqual(summary['group_by'], ['name'])
-
         query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
         parser = QueryParser(query)
         summary = parser.summarize_query()
         self.assertEqual(summary['group_by'], ['department'])
         self.assertEqual(summary['having'], ['count(*) > 10'])
 
+    # Tests summary involving ORDER BY clause presence.
     def test_order_by(self):
         query = "SELECT name, age FROM employees ORDER BY age DESC"
         parser = QueryParser(query)
@@ -468,6 +469,7 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         summary = parser.summarize_query()
         self.assertEqual(summary['order_by'], [('salary', 'ASC'), ('name', 'DESC')])
 
+    # Tests summary involing HAVING clause presence.
     def test_having(self):
         query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
         parser = QueryParser(query)
@@ -479,6 +481,7 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         summary = parser.summarize_query()
         self.assertEqual(summary['having'], ['sum(salary) > 50000', 'OR', 'count(*) < 5'])
 
+    # Tests summary involing LIMIT presence.
     def test_limit(self):
         query = "SELECT name FROM employees LIMIT 10"
         parser = QueryParser(query)
@@ -495,11 +498,13 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         summary = parser.summarize_query()
         self.assertEqual(summary['limit'], 10)
 
+    # Tests the parsing ability of a complex query involving a conjuntion of multiple additional clauses.
     def test_complex_query(self):
         query = "SELECT name, salary FROM employees JOIN departments ON employees.department_id = departments.id WHERE salary > 50000 GROUP BY department HAVING count(*) > 5 ORDER BY salary DESC LIMIT 10"
         parser = QueryParser(query)
         summary = parser.summarize_query()
 
+    # Tests the summary given a simple subquery.
     def test_subquery(self):
         query = """
             SELECT name 
@@ -515,6 +520,7 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         self.assertIn('departments', subquery_summary['tables'])
         self.assertTrue(any("location = 'NY'" in cond for cond in subquery_summary['conditions']))
 
+    # Tests summary given a subquery with JOIN.
     def test_subquery_with_joins(self):
         query = """
             SELECT name 
@@ -533,7 +539,7 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         self.assertIn('conditions', subquery_summary)
         self.assertTrue(any("region = 'West'" in cond for cond in subquery_summary['conditions']))
 
-    
+    # Tests summary given a multi-nested subquery.
     def test_nested_subqueries(self):
         query = "SELECT name FROM employees WHERE department_id IN (SELECT department_id FROM projects WHERE project_id IN (SELECT project_id FROM budgets WHERE amount > 100000))"
         parser = QueryParser(query)
@@ -550,8 +556,6 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         self.assertIn('conditions', nested_subquery)
         self.assertTrue(any('amount > 100000' in cond for cond in nested_subquery['conditions']))
         
-
-
 
 # Runs the tests. 
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))

@@ -1,6 +1,6 @@
 # Ryan Gallagher
 # SQL Query Optimization Tool 
-# main.py
+# app.py
 
 # Resource importing and management. 
 from flask import Flask, render_template, request, jsonify
@@ -10,18 +10,18 @@ from suggestions import Suggestions
 from explain_analyzer import ExplainAnalyzer
 import config
 import os
-import sys
 
 app = Flask(__name__)
 
+# Provides analysis of a SQL query given a SQLite DB. 
 def analyze_query(query, db_path):
-    db = DBConnector(db_path=db_path)
+    db = DBConnector(db_path = db_path)
 
     try:
         query_results = db.execute_query(query)
         explain_rows = db.get_explain(query)
 
-        analyzer = ExplainAnalyzer(explain_rows, raw_query=query)
+        analyzer = ExplainAnalyzer(explain_rows, raw_query = query)
         analysis_result = analyzer.analyze()
         issues_detected = analysis_result.get("issues_detected", [])
 
@@ -47,13 +47,13 @@ def analyze_query(query, db_path):
     finally:
         db.close()
 
-
+# Renders the index.html page.
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
-@app.route('/analyze', methods=['POST'])
+# API endpoint to analyze the SQL query.
+@app.route('/analyze', methods = ['POST'])
 def analyze():
     data = request.get_json()
     raw_path = data.get('db_path', '').strip()

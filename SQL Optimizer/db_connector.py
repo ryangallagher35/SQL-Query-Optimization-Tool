@@ -11,7 +11,6 @@ class DBConnector:
 
     # Establishes a connection to the DB using credentials outlined in DB_CONFIG.
     def __init__(self, db_path = None):
-        # Use passed db_path or fall back to config
         self.db_path = db_path if db_path else DB_CONFIG["db_path"]
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
