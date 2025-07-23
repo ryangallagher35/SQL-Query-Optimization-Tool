@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>SQL Query Optimizer</title>
-    <link rel="stylesheet" href="/static/static.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
@@ -45,7 +45,7 @@
             const summary = result.query_summary;
             if (summary && Object.keys(summary).length > 0) {
                 const table = document.createElement("table");
-                table.classList.add("summary-table");
+                table.classList.add("results-table");
 
                 const tbody = document.createElement("tbody");
 
@@ -59,7 +59,7 @@
 
                     const tdValue = document.createElement("td");
                     // If value is an object or array, stringify it; else just text
-                    tdValue.textContent = (typeof value === "object") ? JSON.stringify(value) : value;
+                    tdValue.textContent = Array.isArray(value) ? value.join(", ") : value;
 
                     tr.appendChild(tdKey);
                     tr.appendChild(tdValue);
