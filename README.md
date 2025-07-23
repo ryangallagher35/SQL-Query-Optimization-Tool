@@ -52,5 +52,4 @@ The **SQL Query Optimization Tool** is a Python-based web application designed t
 ## Next steps
 
 1. Improved versatility to support other relational database management systems, including MySQL and PostgreSQL.
-2. Refactored query_parser.py to improve runtime complexity of SQL query parsing algorithms.
-3. Additional tests to capture performance regarding additional edge cases.
+2. Additional tests to capture performance regarding additional edge cases.
