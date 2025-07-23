@@ -137,38 +137,81 @@ class TestCheckFilesort(unittest.TestCase):
    
 
 class TestUnindexedJoin(unittest.TestCase):
-
-   def test_unindexed_join_detected(self):
+    
+    # Test that an unindexed JOIN is detected when both tables are scanned
+    def test_detects_unindexed_join(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'NESTED LOOP'},  
-            {'selectid': 0, 'order': 1, 'from': 1, 'detail': 'SCAN TABLE orders'},       
-            {'selectid': 0, 'order': 2, 'from': 2, 'detail': 'SCAN TABLE customers'}     
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'LOOP JOIN customers'},
+            {'detail': 'SCAN TABLE customers'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
-    
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'Unindexed JOIN')
-        self.assertIn('orders', analyzer.issues[0]['message'])
-        self.assertIn('customers', analyzer.issues[0]['message'])
+        self.assertIn('customers', analyzer.issues[0]['message'].lower())
 
-   def test_join_with_index_not_flagged(self):
+    # Test that JOIN using an index is NOT flagged
+    def test_indexed_join_not_flagged(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE orders USING INDEX order_idx'}
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'LOOP JOIN customers'},
+            {'detail': 'SEARCH TABLE customers USING INDEX customer_idx (customer_id=?)'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
 
         self.assertEqual(len(analyzer.issues), 0)
 
-   def test_search_with_index_not_flagged(self):
+    # Test that JOIN using INTEGER PRIMARY KEY is NOT flagged
+    def test_join_using_integer_primary_key_not_flagged(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH TABLE orders USING INDEX order_idx'}
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'LOOP JOIN customers'},
+            {'detail': 'SEARCH TABLE customers USING INTEGER PRIMARY KEY (rowid=?)'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unindexed_join()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test that no JOIN results in no issues, even if SCAN is used
+    def test_no_join_no_issue(self):
+        explain_plan = [
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'SCAN TABLE customers'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unindexed_join()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test that multiple unindexed joins are both flagged
+    def test_multiple_unindexed_joins_flagged(self):
+        explain_plan = [
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'LOOP JOIN customers'},
+            {'detail': 'SCAN TABLE customers'},
+            {'detail': 'LOOP JOIN products'},
+            {'detail': 'SCAN TABLE products'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
 
-        self.assertEqual(len(analyzer.issues), 0)
+        self.assertEqual(len(analyzer.issues), 2)
+        messages = [issue['message'].lower() for issue in analyzer.issues]
+        self.assertTrue(any('customers' in m for m in messages))
+        self.assertTrue(any('products' in m for m in messages))
+
+    # Test JOIN listed but missing table access row — should be flagged as unknown
+    def test_join_with_missing_access_info(self):
+        explain_plan = [
+            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'LOOP JOIN customers'}
+            # no access row for customers
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unindexed_join()
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertIn('customers', analyzer.issues[0]['message'].lower())
 
 
 class TestUnnecessarySubquery(unittest.TestCase):
@@ -458,15 +501,15 @@ class TestAnalyzer(unittest.TestCase):
 '''
 suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
 unittest.TextTestRunner(verbosity = 2).run(suite1)
-'''
 
 suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
 unittest.TextTestRunner(verbosity = 2).run(suite2)
-
 '''
+
 suite3 = unittest.TestLoader().loadTestsFromTestCase(TestUnindexedJoin)
 unittest.TextTestRunner(verbosity = 2).run(suite3)
 
+'''
 suite4 = unittest.TestLoader().loadTestsFromTestCase(TestUnnecessarySubquery)
 unittest.TextTestRunner(verbosity = 2).run(suite4)
 

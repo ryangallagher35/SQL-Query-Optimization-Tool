@@ -94,15 +94,39 @@ class ExplainAnalyzer:
                 return True
         return False
 
-    # Detects unindexed JOIN in detail.
+    # Detects unindexed joins in SQL statements.
     def _check_unindexed_join(self):
-            for row in self.explain_plan:
-                detail = row.get("detail", "").upper()
-                if "JOIN" in detail and "INDEX" not in detail:
-                    self.issues.append({
-                        "type": "Unindexed JOIN",
-                        "message": f"JOIN or table scan without index: '{row['detail']}'"
-                    })
+        join_tables = set()
+        access_info = {}
+        
+        for row in self.explain_plan:
+            detail = row.get("detail", "").upper()
+            
+            if "JOIN" in detail:
+                parts = detail.split()
+                for i, word in enumerate(parts):
+                    if word.endswith("JOIN") and i + 1 < len(parts):
+                        join_tables.add(parts[i + 1])
+            
+            if "TABLE" in detail:
+                table_name = None
+                if "SCAN TABLE" in detail:
+                    table_name = detail.split("SCAN TABLE")[1].split()[0]
+                    access_info[table_name] = "SCAN"
+                elif "SEARCH TABLE" in detail:
+                    table_name = detail.split("SEARCH TABLE")[1].split()[0]
+                    if "USING INDEX" in detail or "USING COVERING INDEX" in detail or "USING INTEGER PRIMARY KEY" in detail:
+                        access_info[table_name] = "INDEXED"
+                    else:
+                        access_info[table_name] = "UNINDEXED_SEARCH"
+        
+        for table in join_tables:
+            access = access_info.get(table, "UNKNOWN")
+            if access != "INDEXED":
+                self.issues.append({
+                    "type": "Unindexed JOIN",
+                    "message": f"JOIN on table '{table}' without index (access: {access})"
+                })
                     
     # Detects unecessary subqeuries in SELECT statements.
     def _check_unnecessary_subquery(self):
@@ -112,7 +136,8 @@ class ExplainAnalyzer:
                 "type": "Unnecessary Subquery",
                 "message": "Query contains nested subqueries which may be optimized."
             })
-
+            
+'''
     # Detects if raw_query has LIKE with leading % and no index used.
     def _check_like_without_index(self):
         if "LIKE" in self.raw_query:
@@ -148,3 +173,4 @@ class ExplainAnalyzer:
                 "message": f"Functions used in WHERE clause may disable index usage: {func_calls}"
             })
 
+'''
