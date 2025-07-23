@@ -16,7 +16,7 @@ class QueryParser:
         self.query = query 
         self.parsed = sqlparse.parse(query)[0]
 
-    # Extracts the table names used in the SQL query. 
+    # Extracts the tables in the SQL query.
     def get_tables(self):
         tables = []
         expecting_table = False
@@ -29,24 +29,30 @@ class QueryParser:
     
         parsed = self.parsed
         tokens = parsed.tokens
-    
         i = 0
+    
         while i < len(tokens):
             token = tokens[i]
-    
-            if token.ttype is Keyword and token.value.upper() == "FROM":
-                expecting_table = True
-    
-            elif token.ttype is Keyword:
+            
+            if token.ttype is Keyword:
+                max_lookahead = 3
                 combined_keyword = token.value.upper()
                 j = i + 1
-                while j < len(tokens) and tokens[j].ttype is Keyword:
-                    combined_keyword += " " + tokens[j].value.upper()
-                    j += 1
+                while j < len(tokens) and max_lookahead > 0:
+                    next_token = tokens[j]
+                    if next_token.ttype is Keyword:
+                        combined_keyword += " " + next_token.value.upper()
+                        j += 1
+                        max_lookahead -= 1
+                    else:
+                        break
     
                 if combined_keyword in join_keywords:
                     expecting_table = True
-                    i = j - 1
+                    i = j - 1  
+    
+            elif token.ttype is Keyword and token.value.upper() == "FROM":
+                expecting_table = True
     
             elif expecting_table:
                 if isinstance(token, Identifier):
@@ -344,7 +350,7 @@ class QueryParser:
             for i, char in enumerate(sql):
                 if char == '(':
                     if start_idx is None:
-                        lookahead = sql[i+1:i+7].strip().upper()
+                        lookahead = sql[i + 1:i + 7].strip().upper()
                         if lookahead.startswith('SELECT'):
                             start_idx = i
                     stack.append(char)
