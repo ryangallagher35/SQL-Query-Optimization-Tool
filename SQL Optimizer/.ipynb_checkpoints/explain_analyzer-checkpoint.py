@@ -127,34 +127,25 @@ class ExplainAnalyzer:
                     "type": "Unindexed JOIN",
                     "message": f"JOIN on table '{table}' without index (access: {access})"
                 })
-                    
-    # Detects unecessary subqeuries in SELECT statements.
-    def _check_unnecessary_subquery(self):
-        if "SUBQUERY" in " ".join(r.get("detail", "").upper() for r in self.explain_plan) or \
-           "SELECT" in self.raw_query and "SELECT" in self.raw_query[self.raw_query.find("SELECT") + 1:]:
-            self.issues.append({
-                "type": "Unnecessary Subquery",
-                "message": "Query contains nested subqueries which may be optimized."
-            })
-            
-'''
-    # Detects if raw_query has LIKE with leading % and no index used.
-    def _check_like_without_index(self):
-        if "LIKE" in self.raw_query:
-            like_patterns = re.findall(r"LIKE\s+'(.*?)'", self.raw_query)
-            for pattern in like_patterns:
-                if pattern.startswith("%"):
-                    self.issues.append({
-                        "type": "LIKE without index",
-                        "message": f"LIKE pattern starts with wildcard '{pattern}', index not used."
-                    })
 
-    # Checks if raw_query contains OR and explain indicates no index usage.
+    # Detects inefficiencies surrounding the "LIKE" clause.
+    def _check_like_without_index(self):
+        like_patterns = re.findall(r"LIKE\s+['\"](.*?)['\"]", self.raw_query, flags=re.IGNORECASE)
+        
+        for pattern in like_patterns:
+            if pattern.startswith('%'):
+                self.issues.append({
+                    "type": "LIKE without index",
+                    "message": f"LIKE pattern starts with wildcard '{pattern}', index likely not used."
+                })
+
+
+    # Checks for inefficiencies pertaining to "OR" conditions.
     def _check_inefficient_or_conditions(self):
-        if " OR " in self.raw_query:
+        if re.search(r'\bOR\b', self.raw_query, re.IGNORECASE):
             for row in self.explain_plan:
                 detail = row.get("detail", "").upper()
-                if "SCAN" in detail and "INDEX" not in detail:
+                if ("SCAN TABLE" in detail) and ("INDEX" not in detail):
                     self.issues.append({
                         "type": "Inefficient OR Conditions",
                         "message": "OR condition detected that may prevent index usage."
@@ -166,11 +157,9 @@ class ExplainAnalyzer:
         where_clause = ""
         if "WHERE" in self.raw_query:
             where_clause = self.raw_query.split("WHERE")[1]
-        func_calls = re.findall(r"\b[A-Z]+\s*\([^)]*\)", where_clause)
+        func_calls = re.findall(r"\b[A-Z]+\s*\([^)]*\)", where_clause, re.IGNORECASE)
         if func_calls:
             self.issues.append({
                 "type": "Functions on Indexed Columns",
                 "message": f"Functions used in WHERE clause may disable index usage: {func_calls}"
             })
-
-'''

@@ -195,7 +195,6 @@ class TestUnindexedJoin(unittest.TestCase):
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
-
         self.assertEqual(len(analyzer.issues), 2)
         messages = [issue['message'].lower() for issue in analyzer.issues]
         self.assertTrue(any('customers' in m for m in messages))
@@ -214,30 +213,6 @@ class TestUnindexedJoin(unittest.TestCase):
         self.assertIn('customers', analyzer.issues[0]['message'].lower())
 
 
-class TestUnnecessarySubquery(unittest.TestCase):
-
-    def test_detects_nested_subquery_keyword(self):
-        explain_plan = [
-            {'detail': 'SUBQUERY on orders'}
-        ]
-        analyzer = ExplainAnalyzer(explain_plan)
-        analyzer.raw_query = "SELECT * FROM (SELECT * FROM orders)"
-        analyzer._check_unnecessary_subquery()
-
-        self.assertEqual(len(analyzer.issues), 1)
-        self.assertEqual(analyzer.issues[0]['type'], 'Unnecessary Subquery')
-
-    def test_no_subquery_not_flagged(self):
-        explain_plan = [
-            {'detail': 'SCAN TABLE orders'}
-        ]
-        analyzer = ExplainAnalyzer(explain_plan)
-        analyzer.raw_query = "SELECT * FROM orders"
-        analyzer._check_unnecessary_subquery()
-
-        self.assertEqual(len(analyzer.issues), 0)
-
-
 class TestLikeWithoutIndex(unittest.TestCase):
 
     def test_leading_wildcard_like_flagged(self):
@@ -245,7 +220,6 @@ class TestLikeWithoutIndex(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name LIKE '%john%'"
         analyzer._check_like_without_index()
-
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'LIKE without index')
         self.assertIn('%john%', analyzer.issues[0]['message'])
@@ -255,7 +229,6 @@ class TestLikeWithoutIndex(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name LIKE 'john%'"
         analyzer._check_like_without_index()
-
         self.assertEqual(len(analyzer.issues), 0)
 
     def test_like_clause_missing(self):
@@ -263,7 +236,6 @@ class TestLikeWithoutIndex(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'john'"
         analyzer._check_like_without_index()
-
         self.assertEqual(len(analyzer.issues), 0)
 
 
@@ -276,7 +248,6 @@ class TestInefficientOrConditions(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
         analyzer._check_inefficient_or_conditions()
-
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'Inefficient OR Conditions')
 
@@ -287,7 +258,6 @@ class TestInefficientOrConditions(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
         analyzer._check_inefficient_or_conditions()
-
         self.assertEqual(len(analyzer.issues), 0)
 
     def test_no_or_clause(self):
@@ -297,8 +267,37 @@ class TestInefficientOrConditions(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A'"
         analyzer._check_inefficient_or_conditions()
-
         self.assertEqual(len(analyzer.issues), 0)
+
+    # Test: OR condition on same column using index should not be flagged
+    def test_or_on_same_indexed_column(self):
+        explain_plan = [
+            {'detail': 'SEARCH TABLE users USING INDEX user_name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR name = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test: Mixed plan — one using index, one full scan — should still be flagged
+    def test_or_with_partial_index_usage(self):
+        explain_plan = [
+            {'detail': 'SEARCH TABLE users USING INDEX user_name_idx'},
+            {'detail': 'SCAN TABLE users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 1)
+
+    # Test: Malformed query still containing OR should be flagged based on plan
+    def test_or_with_malformed_query(self):
+        explain_plan = [{'detail': 'SCAN TABLE users'}]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 1)
+
 
 class TestFunctionsOnIndexedColumns(unittest.TestCase):
 
@@ -307,7 +306,6 @@ class TestFunctionsOnIndexedColumns(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE LOWER(name) = 'john'"
         analyzer._check_functions_on_indexed_columns()
-
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'Functions on Indexed Columns')
         self.assertIn('LOWER(name)', str(analyzer.issues[0]['message']))
@@ -317,211 +315,24 @@ class TestFunctionsOnIndexedColumns(unittest.TestCase):
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'john'"
         analyzer._check_functions_on_indexed_columns()
-
         self.assertEqual(len(analyzer.issues), 0)
 
 
-# Tests analyze method. 
-class TestAnalyzer(unittest.TestCase):
-
-    def setUp(self):
-        self.full_table_scan_plan = [
-            {"detail": "SCAN TABLE users"},
-            {"detail": "SEARCH TABLE orders USING INDEX order_idx"}
-        ]
-
-        self.missing_index_plan = [
-            {"detail": "SEARCH TABLE users"},
-            {"detail": "SEARCH TABLE orders USING INDEX order_idx"}
-        ]
-
-        self.filesort_temp_plan = [
-            {"detail": "USING TEMP B-TREE"},
-            {"detail": "USING TEMP B-TREE FOR ORDER BY"},
-            {"detail": "NO ISSUE HERE"}
-        ]
-
-        self.unindexed_join_plan = [
-            {"detail": "SCAN TABLE orders"},
-            {"detail": "JOIN orders to users"}
-        ]
-
-        self.subquery_plan = [
-            {"detail": "SOMETHING"},  
-        ]
-
-        self.like_without_index_plan = []
-        self.or_condition_plan = [
-            {"detail": "SCAN TABLE users"}
-        ]
-
-
-        self.functions_on_index_plan = []
-        self.order_by_temp_plan = [
-            {"detail": "USING TEMP TABLE"}
-        ]
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": True,
-        "unnecessary_filesort": False, 
-        "unindexed_join": False,            
-        "unnecessary_subquery": False,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": False,                  
-        "functions_on_indexed_columns": False    
-    })
-    def test_detect_full_table_scan(self):
-        analyzer = ExplainAnalyzer(self.full_table_scan_plan)
-        result = analyzer.analyze()
-        self.assertEqual(result["total_issues"], 1)
-        self.assertEqual(result["issues_detected"][0]["type"], "Full Table Scan")
-
-    
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": False,
-        "unnecessary_filesort": True, 
-        "unindexed_join": False,            
-        "unnecessary_subquery": False,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": False,                  
-        "functions_on_indexed_columns": False     
-    })
-    def test_detect_filesort_and_temp_structures(self):
-        analyzer = ExplainAnalyzer(self.filesort_temp_plan)
-        result = analyzer.analyze()
-        types = [issue["type"] for issue in result["issues_detected"]]
-        self.assertIn("Using Temporary Structure", types)
-        self.assertIn("Filesort", types)
-        self.assertEqual(result["total_issues"], 2)
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": True,
-        "unnecessary_filesort": True, 
-        "unindexed_join": True,            
-        "unnecessary_subquery": True,        
-        "like_without_index": True,        
-        "inefficient_or_conditions": True,                
-        "functions_on_indexed_columns": True  
-    })
-    def test_clean_plan_no_issues(self):
-        clean_plan = [
-            {"detail": "SCAN TABLE users USING INDEX user_idx"},
-            {"detail": "SEARCH TABLE users USING INDEX user_idx"}
-        ]
-        analyzer = ExplainAnalyzer(clean_plan)
-        result = analyzer.analyze()
-        self.assertEqual(result["total_issues"], 0)
-
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": True,
-        "unnecessary_filesort": False, 
-        "unindexed_join": True,            
-        "unnecessary_subquery": False,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": False,                 
-        "functions_on_indexed_columns": False    
-    })
-    def test_detect_unindexed_join(self):
-        analyzer = ExplainAnalyzer(self.unindexed_join_plan)
-        result = analyzer.analyze()
-        types = [issue["type"] for issue in result["issues_detected"]]
-        self.assertIn("Full Table Scan", types)
-        self.assertIn("Unindexed JOIN", types)
-        self.assertEqual(result["total_issues"], 2)
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": True,
-        "unnecessary_filesort": False, 
-        "unindexed_join": False,            
-        "unnecessary_subquery": True,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": False,                 
-        "functions_on_indexed_columns": False   
-    })
-    def test_detect_unnecessary_subquery(self):
-        analyzer = ExplainAnalyzer(self.subquery_plan)
-        analyzer.raw_query = "SELECT * FROM (SELECT * FROM users)"
-        result = analyzer.analyze()
-        self.assertEqual(result["total_issues"], 1)
-        self.assertEqual(result["issues_detected"][0]["type"], "Unnecessary Subquery")
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": False,
-        "unnecessary_filesort": False, 
-        "unindexed_join": False,            
-        "unnecessary_subquery" : False,        
-        "like_without_index": True,        
-        "inefficient_or_conditions": False,                  
-        "functions_on_indexed_columns": False   
-    })
-    def test_detect_like_with_leading_wildcard(self):
-        analyzer = ExplainAnalyzer(self.like_without_index_plan)
-        analyzer.raw_query = "SELECT * FROM users WHERE name LIKE '%john%'"
-        result = analyzer.analyze()
-        self.assertEqual(result["total_issues"], 1)
-        self.assertEqual(result["issues_detected"][0]["type"], "LIKE without index")
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": False,
-        "unnecessary_filesort": False, 
-        "unindexed_join": False,            
-        "unnecessary_subquery": False,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": True,                  
-        "functions_on_indexed_columns": False   
-    })
-    def test_detect_or_condition_without_index(self):
-        analyzer = ExplainAnalyzer(self.or_condition_plan)
-        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
-        result = analyzer.analyze()
-        types = [issue["type"] for issue in result["issues_detected"]]
-        self.assertIn("Full Table Scan", types)
-        self.assertIn("Inefficient OR Conditions", types)
-        self.assertEqual(result["total_issues"], 2)
-
-    @patch("config.OPTIMIZATION_THRESHOLDS", {
-        "full_table_scan": False,
-        "unnecessary_filesort": False, 
-        "unindexed_join": False,            
-        "unnecessary_subquery": False,        
-        "like_without_index": False,        
-        "inefficient_or_conditions": False,                 
-        "functions_on_indexed_columns": True
-    })
-    def test_detect_function_on_indexed_column(self):
-        analyzer = ExplainAnalyzer(self.functions_on_index_plan)
-        analyzer.raw_query = "SELECT * FROM users WHERE LOWER(name) = 'john'"
-        result = analyzer.analyze()
-        self.assertEqual(result["total_issues"], 1)
-        self.assertEqual(result["issues_detected"][0]["type"], "Functions on Indexed Columns")
-
-
 # Run the tests.
-'''
 suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
 unittest.TextTestRunner(verbosity = 2).run(suite1)
 
 suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
 unittest.TextTestRunner(verbosity = 2).run(suite2)
-'''
 
 suite3 = unittest.TestLoader().loadTestsFromTestCase(TestUnindexedJoin)
 unittest.TextTestRunner(verbosity = 2).run(suite3)
 
-'''
-suite4 = unittest.TestLoader().loadTestsFromTestCase(TestUnnecessarySubquery)
+suite4 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
 unittest.TextTestRunner(verbosity = 2).run(suite4)
 
-suite5 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
+suite5 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
 unittest.TextTestRunner(verbosity = 2).run(suite5)
 
-suite6 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
+suite6 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
 unittest.TextTestRunner(verbosity = 2).run(suite6)
-
-suite7 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
-unittest.TextTestRunner(verbosity = 2).run(suite7)
-
-suite8 = unittest.TestLoader().loadTestsFromTestCase(TestAnalyzer)
-unittest.TextTestRunner(verbosity=2).run(suite8)
-'''

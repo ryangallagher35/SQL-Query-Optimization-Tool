@@ -34,11 +34,6 @@ class Suggestions:
                     "Add indexes to columns used in JOIN conditions to improve performance and reduce scan costs."
                 )
 
-            elif issue_type == "Unnecessary subquery":
-                suggestions.append(
-                    "Consider flattening nested subqueries or using JOINs where applicable to simplify and speed up the query."
-                )
-
             elif issue_type == "LIKE without index":
                 suggestions.append(
                     "Avoid using leading wildcards (e.g., '%value') in LIKE patterns; consider full-text search or redesigning the query."
