@@ -58,7 +58,48 @@
                     tdKey.style.paddingRight = "10px";
 
                     const tdValue = document.createElement("td");
-                    tdValue.textContent = Array.isArray(value) ? value.join(", ") : value;
+
+                    // Check if value is an array of objects (subquery-like)
+                    if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
+                        const containerDiv = document.createElement("div");
+
+                        value.forEach((subqueryData, index) => {
+                            const subqueryTitle = document.createElement("h3");
+                            subqueryTitle.textContent = `Subquery ${index + 1}`;
+                            containerDiv.appendChild(subqueryTitle);
+
+                            const subqueryTable = document.createElement("table");
+                            subqueryTable.classList.add("results-table");
+
+                            const subqueryThead = document.createElement("thead");
+                            const headerRow = document.createElement("tr");
+
+                            const columns = Object.keys(subqueryData);
+                            columns.forEach(col => {
+                                const th = document.createElement("th");
+                                th.textContent = col;
+                                headerRow.appendChild(th);
+                            });
+                            subqueryThead.appendChild(headerRow);
+                            subqueryTable.appendChild(subqueryThead);
+
+                            const subqueryTbody = document.createElement("tbody");
+                            const trSub = document.createElement("tr");
+                            columns.forEach(col => {
+                                const td = document.createElement("td");
+                                td.textContent = subqueryData[col];
+                                trSub.appendChild(td);
+                            });
+                            subqueryTbody.appendChild(trSub);
+                            subqueryTable.appendChild(subqueryTbody);
+
+                            containerDiv.appendChild(subqueryTable);
+                        });
+
+                        tdValue.appendChild(containerDiv);
+                    } else {
+                        tdValue.textContent = Array.isArray(value) ? value.join(", ") : value;
+                    }
 
                     tr.appendChild(tdKey);
                     tr.appendChild(tdValue);
