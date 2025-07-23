@@ -8,7 +8,7 @@
     <div class="container">
         <h1>SQL Query Optimizer</h1>
         <label for="dbPath">Database Path:</label><br>
-        <input id="dbPath" type="text" placeholder="e.g., /path/to/your.db"><br><br>
+        <input id="dbPath" type="text" placeholder="e.g., \path\to\your.db"><br><br>
 
         <label for="query">SQL Query:</label><br>
         <textarea id="query" rows="10" cols="80" placeholder="Enter your SQL query here..."></textarea><br><br>
@@ -31,7 +31,7 @@
             });
 
             const resultDiv = document.getElementById("results");
-            resultDiv.innerHTML = ""; // Clear previous
+            resultDiv.innerHTML = ""; 
 
             const result = await response.json();
 
@@ -58,7 +58,6 @@
                     tdKey.style.paddingRight = "10px";
 
                     const tdValue = document.createElement("td");
-                    // If value is an object or array, stringify it; else just text
                     tdValue.textContent = Array.isArray(value) ? value.join(", ") : value;
 
                     tr.appendChild(tdKey);
@@ -94,7 +93,6 @@
 
                 const columnNames = Object.keys(result.explain_plan[0]);
 
-                // Table header
                 const thead = document.createElement("thead");
                 const headerRow = document.createElement("tr");
                 columnNames.forEach(col => {
@@ -105,7 +103,6 @@
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Table body
                 const tbody = document.createElement("tbody");
                 result.explain_plan.forEach(row => {
                     const tr = document.createElement("tr");
@@ -129,7 +126,6 @@
                 const table = document.createElement("table");
                 table.classList.add("results-table");
 
-                // Create table header
                 const thead = document.createElement("thead");
                 const headerRow = document.createElement("tr");
                 const columnNames = Object.keys(result.query_results[0]);
@@ -141,7 +137,6 @@
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Create table body
                 const tbody = document.createElement("tbody");
                 result.query_results.forEach(row => {
                     const tr = document.createElement("tr");

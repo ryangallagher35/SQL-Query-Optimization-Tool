@@ -371,14 +371,14 @@ class QueryParser:
     def summarize_query(self): 
     
         return { 
-            "tables" : self.get_tables(), 
-            "columns" : self.get_columns(), 
-            "joins" : self.get_joins(), 
-            "conditions" : self.get_conditions(), 
-            "order_by" : self.get_order_by(), 
-            "group_by" : self.get_group_by(), 
-            "having" : self.get_having(), 
-            "subqueries" : self.get_subqueries()
+            "Tables" : self.get_tables(), 
+            "Columns" : self.get_columns(), 
+            "Joins" : self.get_joins(), 
+            "Conditions" : self.get_conditions(), 
+            "ORDER BY clauses" : self.get_order_by(), 
+            "GROUP BY clauses" : self.get_group_by(), 
+            "HAVING clauses" : self.get_having(), 
+            "Subqueries" : self.get_subqueries()
         }
 
         
