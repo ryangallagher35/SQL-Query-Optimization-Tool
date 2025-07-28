@@ -101,12 +101,14 @@ class ExplainAnalyzer:
         
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            
+
+
             if "JOIN" in detail:
                 parts = detail.split()
                 for i, word in enumerate(parts):
                     if word.endswith("JOIN") and i + 1 < len(parts):
                         join_tables.add(parts[i + 1])
+            
             
             if "TABLE" in detail:
                 table_name = None

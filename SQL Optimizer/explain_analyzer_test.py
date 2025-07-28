@@ -317,6 +317,76 @@ class TestFunctionsOnIndexedColumns(unittest.TestCase):
         analyzer._check_functions_on_indexed_columns()
         self.assertEqual(len(analyzer.issues), 0)
 
+class TestExplainAnalyzer(unittest.TestCase):
+
+    def test_all_checks_triggered(self):
+        explain_plan = [
+            {'detail': 'SCAN TABLE users'},  
+            {'detail': 'SCAN TABLE customers'},  
+            {'detail': 'LOOP JOIN customers'},
+            {'detail': 'SCAN TABLE users USING TEMP B-TREE FOR ORDER BY'}  
+        ]
+        raw_query = """
+            SELECT * FROM users 
+            JOIN customers ON users.id = customers.user_id 
+            WHERE LOWER(name) = 'john' OR email LIKE '%example.com%' 
+            ORDER BY lastname, firstname
+        """
+        schema_index_info = {
+            "USERS": {"idx_lastname_firstname": ["LASTNAME", "FIRSTNAME"]},
+            "CUSTOMERS": {}
+        }
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query, schema_index_info)
+        result = analyzer.analyze()
+
+        issue_types = [issue['type'] for issue in result['issues_detected']]
+
+        self.assertIn('Full Table Scan', issue_types)
+        self.assertIn('Unindexed JOIN', issue_types)
+        self.assertIn('Unnecessary Filesort', issue_types)
+        self.assertIn('Functions on Indexed Columns', issue_types)
+        self.assertIn('LIKE without index', issue_types)
+        self.assertIn('Inefficient OR Conditions', issue_types)
+        self.assertEqual(result['total_issues'], 8)
+
+    def test_no_issues_detected(self):
+        explain_plan = [
+            {'detail': 'SEARCH TABLE users USING INDEX user_idx'},
+            {'detail': 'SEARCH TABLE customers USING INDEX cust_idx'},
+        ]
+        raw_query = "SELECT * FROM users JOIN customers ON users.id = customers.user_id WHERE name = 'John' ORDER BY lastname"
+        schema_index_info = {
+            "USERS": {"idx_lastname": ["LASTNAME"]},
+            "CUSTOMERS": {"cust_idx": ["USER_ID"]}
+        }
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query, schema_index_info)
+        result = analyzer.analyze()
+
+        self.assertEqual(result['total_issues'], 0)
+        self.assertEqual(result['issues_detected'], [])
+
+    def test_partial_issues_detected(self):
+        explain_plan = [
+            {'detail': 'SCAN TABLE users'},
+            {'detail': 'USING TEMP B-TREE FOR ORDER BY'}
+        ]
+        raw_query = "SELECT * FROM users WHERE email LIKE '%gmail.com%' ORDER BY lastname"
+        schema_index_info = {
+            "USERS": {"idx_lastname": ["LASTNAME"]}
+        }
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query, schema_index_info)
+        result = analyzer.analyze()
+
+        issue_types = [issue['type'] for issue in result['issues_detected']]
+
+        self.assertIn('Full Table Scan', issue_types)
+        self.assertIn('Unnecessary Filesort', issue_types)
+        self.assertIn('LIKE without index', issue_types)
+        self.assertEqual(result['total_issues'], 3)
+
 
 # Run the tests.
 suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
@@ -336,3 +406,6 @@ unittest.TextTestRunner(verbosity = 2).run(suite5)
 
 suite6 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
 unittest.TextTestRunner(verbosity = 2).run(suite6)
+
+suite7 = unittest.TestLoader().loadTestsFromTestCase(TestExplainAnalyzer)
+unittest.TextTestRunner(verbosity = 2).run(suite7)
