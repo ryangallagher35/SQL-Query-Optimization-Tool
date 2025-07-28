@@ -2,7 +2,8 @@
 # SQL Query Optimization Tool
 # suggestions.py
 
- # Constructs a list of dicts describing detected query inefficiencies from ExplainAnalyzer.
+
+# Constructs a list of dicts describing detected query inefficiencies from ExplainAnalyzer.
 class Suggestions:
 
     # Initializes issues_detected.
@@ -19,41 +20,44 @@ class Suggestions:
 
             if issue_type == "Full Table Scan":
                 suggestions.append(
-                    "Consider adding appropriate indexes on columns used in WHERE or JOIN clauses "
-                    "to avoid full table scans."
+                    "The query performs a full table scan without using any index. "
+                    "Consider adding indexes on columns used in WHERE or JOIN conditions to avoid full scans."
                 )
 
             elif issue_type == "Unnecessary Filesort":
                 suggestions.append(
-                    "Avoid ORDER BY operations that require filesort; "
-                    "index columns involved in sorting or limit sorting where possible."
+                    "SQLite is using a temporary B-tree for ORDER BY, even though an index might cover the sort columns. "
+                    "Ensure ORDER BY columns match the leading columns of an available index in order."
                 )
 
             elif issue_type == "Unindexed JOIN":
                 suggestions.append(
-                    "Add indexes to columns used in JOIN conditions to improve performance and reduce scan costs."
+                    "A JOIN operation is being executed without using an index on the joined column. "
+                    "Consider adding indexes on columns used in JOIN conditions to reduce scan costs."
                 )
 
             elif issue_type == "LIKE without index":
                 suggestions.append(
-                    "Avoid using leading wildcards (e.g., '%value') in LIKE patterns; consider full-text search or redesigning the query."
+                    "A LIKE clause uses a leading wildcard (e.g., '%value'), which prevents index usage. "
+                    "If possible, avoid leading wildcards or use full-text search for better performance."
                 )
 
             elif issue_type == "Inefficient OR Conditions":
                 suggestions.append(
-                    "Rewrite OR conditions using UNION or ensure each condition benefits from an index to maintain performance."
+                    "OR conditions can prevent index use if not carefully structured. "
+                    "Consider breaking the query into separate indexed queries combined with UNION."
                 )
 
             elif issue_type == "Functions on Indexed Columns":
                 suggestions.append(
-                    "Avoid wrapping indexed columns in functions in the WHERE clause; refactor the query to allow index usage."
+                    "Functions are applied to columns in the WHERE clause, which disables index use. "
+                    "Consider rewriting conditions to compare raw column values directly when possible."
                 )
-
 
             else:
                 suggestions.append(f"No specific suggestion available for issue: {message}")
 
         if not suggestions:
-            suggestions.append("No issues detected. Query is optimized based on current thresholds.")
+            suggestions.append("No issues detected. Query appears to be optimized based on current thresholds.")
 
         return suggestions
