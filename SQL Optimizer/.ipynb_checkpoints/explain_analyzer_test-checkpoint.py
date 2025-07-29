@@ -60,7 +60,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Tests if an unnecessary filesort is detected.
     def test_unnecessary_filesort_detected(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USE TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users ORDER BY lastname, firstname"
 
@@ -97,7 +97,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Test when filesort occurs but columns are NOT covered by index; no issue should be raised.
     def test_filesort_not_covered_by_index(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USE TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users ORDER BY lastname, firstname"
         schema_index_info = {"USERS": {"idx_email": ["EMAIL"]}}  # Wrong index
@@ -108,7 +108,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Test when multiple tables exist but table name cannot be inferred; should skip.
     def test_multiple_tables_unknown_target(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USE TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users JOIN orders ON users.id = orders.user_id ORDER BY users.lastname"
         schema_index_info = {
@@ -123,7 +123,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Test when only one table is present and table name is missing in detail; fallback should work.
     def test_single_table_inferred_from_context(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users ORDER BY lastname"
         schema_index_info = {
@@ -330,7 +330,7 @@ class TestExplainAnalyzer(unittest.TestCase):
     # Ensures all checks are triggered.
     def test_all_checks_triggered(self):
         explain_plan = [
-            {'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'},
+            {'detail': 'SCAN users USE TEMP B-TREE FOR ORDER BY'},
             {'detail': 'SCAN users'},  
             {'detail': 'SCAN customers'},  
             {'detail': 'LOOP JOIN customers'},
@@ -381,7 +381,7 @@ class TestExplainAnalyzer(unittest.TestCase):
     def test_partial_issues_detected(self):
         explain_plan = [
             {'detail': 'SCAN users'},
-            {'detail': 'USING TEMP B-TREE FOR ORDER BY'}
+            {'detail': 'USE TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users WHERE email LIKE '%gmail.com%' ORDER BY lastname"
         schema_index_info = {

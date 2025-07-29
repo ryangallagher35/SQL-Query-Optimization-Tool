@@ -66,7 +66,7 @@ class ExplainAnalyzer:
 
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "USING TEMP B-TREE FOR ORDER BY" in detail:
+            if "USE TEMP B-TREE FOR ORDER BY" in detail:
         
                 table_name = None
                 if "SCAN" in detail:
