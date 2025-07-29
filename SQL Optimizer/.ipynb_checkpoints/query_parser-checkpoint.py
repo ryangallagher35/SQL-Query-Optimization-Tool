@@ -251,7 +251,7 @@ class QueryParser:
                 continue
             column_name = parts[0]
             direction = parts[1].upper() if len(parts) > 1 and parts[1].upper() in ("ASC", "DESC") else "ASC"
-            order_by_columns.append((column_name, direction))
+            order_by_columns.append(f"{column_name} {direction}")
     
         return order_by_columns
     

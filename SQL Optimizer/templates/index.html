@@ -58,9 +58,9 @@
                     tdKey.style.paddingRight = "10px";
 
                     const tdValue = document.createElement("td");
-
+                    
                     // Check if value is an array of objects (subquery-like)
-                    if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
+                    if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object" && key === "Subqueries") {
                         const containerDiv = document.createElement("div");
 
                         value.forEach((subqueryData, index) => {
