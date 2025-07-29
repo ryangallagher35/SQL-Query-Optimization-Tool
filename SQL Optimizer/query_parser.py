@@ -255,35 +255,7 @@ class QueryParser:
     
         return order_by_columns
     
-    # Extracts only the ORDER BY columns used in the SQL query. (Used to detect filesort inefficiencies in explain_analyzer). 
-    def get_order_by_columns(self):
-        order_by_cols = []
-        order_by_seen = False
-    
-        for token in self.parsed.tokens:
-            if token.ttype is Keyword and token.value.upper() == "ORDER BY":
-                order_by_seen = True
-                continue
-    
-            if order_by_seen:
-                if isinstance(token, IdentifierList):
-                    for identifier in token.get_identifiers():
-                        col_name = identifier.get_real_name()
-                        if col_name:
-                            order_by_cols.append(col_name.upper())
-                    break
-                elif isinstance(token, Identifier):
-                    col_name = token.get_real_name()
-                    if col_name:
-                        order_by_cols.append(col_name.upper())
-                    break
-                elif token.ttype in (Whitespace, Punctuation):
-                    continue
-                else:
-                    break
-    
-        return order_by_cols
-    
+
     # Extracts GROUP BY columns from the SQL query.
     def get_group_by(self):
         group_by_columns = []
@@ -375,22 +347,31 @@ class QueryParser:
             subqueries_found = []
             stack = []
             start_idx = None
+            length = len(sql)
     
-            for i, char in enumerate(sql):
+            i = 0
+            while i < length:
+                char = sql[i]
+    
                 if char == '(':
                     if start_idx is None:
-                        lookahead = sql[i + 1:i + 7].strip().upper()
-                        if lookahead.startswith('SELECT'):
+                        j = i + 1
+                        while j < length and sql[j].isspace():
+                            j += 1
+                        if sql[j:j + 6].upper() == 'SELECT':
                             start_idx = i
                     stack.append(char)
+    
                 elif char == ')':
                     if stack:
                         stack.pop()
                         if not stack and start_idx is not None:
-                            subquery = sql[start_idx + 1:i]  
+                            subquery = sql[start_idx + 1:i]
                             subqueries_found.append(subquery.strip())
                             subqueries_found.extend(extract_subqueries(subquery.strip()))
                             start_idx = None
+                i += 1
+    
             return subqueries_found
     
         raw_subqueries = extract_subqueries(query_str)

@@ -4,17 +4,15 @@
 
 # Resource importing and management
 from config import OPTIMIZATION_THRESHOLDS
-from query_parser import QueryParser
 import re
 
 # Analyzes output from get_explain and flags inefficiencies based on thresholds confined in config.py.
 class ExplainAnalyzer:
 
     # Initializes the explain output from SQLite as input.
-    def __init__(self, explain_plan, raw_query = "", schema_index_info = None):
+    def __init__(self, explain_plan, raw_query = ""):
         self.explain_plan = explain_plan
         self.raw_query = raw_query.upper() 
-        self.schema_index_info = schema_index_info or {}
         self.issues = []
 
     # Main analysis method that runs all checks based on OPTIMIZATION_THRESHOLDS from config.py
@@ -49,83 +47,26 @@ class ExplainAnalyzer:
     def _check_full_table_scan(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "SCAN" in detail and "INDEX" not in detail:
+            if "SCAN" in detail and "USING INDEX" not in detail:
                 self.issues.append({
                     "type": "Full Table Scan",
                     "message": f"Query performs full scan: '{row['detail']}'"
                 })
             
-    # Heuristically detect potential use of filesort or temporary data structures.
+    # Heuristically detect potential use of filesort.
     def _check_unnecessary_filesort(self):
-        parser = QueryParser(self.raw_query)
-        order_by_cols = parser.get_order_by_columns()
-        tables = parser.get_tables()
-
-        if not order_by_cols or not tables:
-            return  
-
+        index_seen = False
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "USE TEMP B-TREE FOR ORDER BY" in detail:
-        
-                table_name = None
-                if "SCAN" in detail:
-                    parts = detail.split("SCAN")
-                    if len(parts) > 1:
-                        table_name = parts[1].split()[0].strip()
-
-                if not table_name and len(tables) == 1:
-                    table_name = tables[0].upper()
-
-                if not table_name:
-                    continue
-
-                index_info = self.schema_index_info.get(table_name.upper(), {})
-                if self._order_by_covered_by_index(order_by_cols, index_info):
-                    self.issues.append({
-                        "type": "Unnecessary Filesort",
-                        "message": f"Temp B-tree used for ORDER BY on '{table_name}', but ORDER BY columns appear to be index-covered: '{row['detail']}'"
-                    })
+            if "USING INDEX" in detail:
+                index_seen = True
+            if "USE TEMP B-TREE FOR ORDER BY" in detail and not index_seen:
+                self.issues.append({
+                    "type": "Unnecessary Filesort",
+                    "message": f"Query may be using an unnecessary filesort: '{row['detail']}'"
+                })
 
     
-    # Checks if the columns used in an ORDER BY clause are covered by any existing index, in correct order.
-    def _order_by_covered_by_index(self, order_by_cols, index_dict):
-        for indexed_cols in index_dict.values():
-            if [col.upper() for col in indexed_cols[:len(order_by_cols)]] == order_by_cols:
-                return True
-        return False
-
-
-    # Detects unindexed joins in SQL statements.
-    def _check_unindexed_join(self):
-        for i, row in enumerate(self.explain_plan):
-            detail = row.get('detail', '')
-            if detail.startswith('LOOP JOIN'):
-                parts = detail.split()
-                if len(parts) >= 3:
-                    join_table = parts[2]
-    
-                    found_access = False
-                    for j in range(i + 1, len(self.explain_plan)):
-                        access_detail = self.explain_plan[j].get('detail', '')
-                        if join_table not in access_detail:
-                            continue
-    
-                        if access_detail.startswith('SEARCH') and (
-                            'USING INDEX' in access_detail or 'USING INTEGER PRIMARY KEY' in access_detail):
-                            found_access = True
-                            break
-                        elif access_detail.startswith('SCAN') and join_table in access_detail:
-                            found_access = False
-                            break
-    
-                    if not found_access:
-                        self.issues.append({
-                            'type': 'Unindexed JOIN',
-                            'message': f'Unindexed JOIN detected on table "{join_table}".'
-                        })
-      
-
     # Detects inefficiencies surrounding the "LIKE" clause.
     def _check_like_without_index(self):
         like_patterns = re.findall(r"LIKE\s+['\"](.*?)['\"]", self.raw_query, flags=re.IGNORECASE)

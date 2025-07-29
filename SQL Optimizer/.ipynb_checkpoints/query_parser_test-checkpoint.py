@@ -394,11 +394,11 @@ class TestSummarizeQuery(unittest.TestCase):
         query = "SELECT u.id, u.name, o.amount FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.amount > 100 AND u.status = 'active';"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        self.assertEqual(set(summary["tables"]), {"users", "orders"})
-        self.assertEqual(set(summary["columns"]), {"id", "name", "amount"})
-        self.assertEqual(summary["joins"], ["INNER JOIN orders o ON u.id = o.user_id"])
+        self.assertEqual(set(summary["Tables"]), {"users", "orders"})
+        self.assertEqual(set(summary["Columns"]), {"id", "name", "amount"})
+        self.assertEqual(summary["Joins"], ["INNER JOIN orders o ON u.id = o.user_id"])
         self.assertEqual(
-            summary["conditions"], 
+            summary["Conditions"], 
             ["o.amount > 100", "AND", "u.status = 'active'"]
         )
 
@@ -407,40 +407,40 @@ class TestSummarizeQuery(unittest.TestCase):
         query = "SELECT * FROM customers;"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        self.assertEqual(summary["tables"], ["customers"])
-        self.assertEqual(summary["columns"], ["*"])
-        self.assertEqual(summary["joins"], [])
-        self.assertEqual(summary["conditions"], [])
+        self.assertEqual(summary["Tables"], ["customers"])
+        self.assertEqual(summary["Columns"], ["*"])
+        self.assertEqual(summary["Joins"], [])
+        self.assertEqual(summary["Conditions"], [])
 
     # Test summary with BETWEEN and alias
     def test_summary_with_between(self):
         query = "SELECT o.* FROM orders o WHERE o.date BETWEEN '2024-01-01' AND '2024-12-31';"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        self.assertEqual(summary["tables"], ["orders"])
-        self.assertEqual(summary["columns"], ["o.*"])
-        self.assertEqual(summary["joins"], [])
-        self.assertEqual(summary["conditions"], ["o.date BETWEEN '2024-01-01' AND '2024-12-31'"])
+        self.assertEqual(summary["Tables"], ["orders"])
+        self.assertEqual(summary["Columns"], ["o.*"])
+        self.assertEqual(summary["Joins"], [])
+        self.assertEqual(summary["Conditions"], ["o.date BETWEEN '2024-01-01' AND '2024-12-31'"])
 
     # Test summary for query without WHERE or JOIN
     def test_summary_minimal(self):
         query = "SELECT name FROM employees;"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        self.assertEqual(summary["tables"], ["employees"])
-        self.assertEqual(summary["columns"], ["name"])
-        self.assertEqual(summary["joins"], [])
-        self.assertEqual(summary["conditions"], [])
+        self.assertEqual(summary["Tables"], ["employees"])
+        self.assertEqual(summary["Columns"], ["name"])
+        self.assertEqual(summary["Joins"], [])
+        self.assertEqual(summary["Conditions"], [])
 
     # Test case insensitivity across all elements
     def test_case_insensitivity_summary(self):
         query = "SeLeCt * FrOm Sales s LeFt JoIn Regions r On s.region_id = r.id WhErE r.name = 'East';"
         qp = QueryParser(query)
         summary = qp.summarize_query()
-        self.assertEqual(set(summary["tables"]), {"Sales", "Regions"})
-        self.assertEqual(summary["columns"], ["*"])
-        self.assertEqual(summary["joins"], ["LeFt JoIn Regions r On s.region_id = r.id"])
-        self.assertEqual(summary["conditions"], ["r.name = 'East'"])
+        self.assertEqual(set(summary["Tables"]), {"Sales", "Regions"})
+        self.assertEqual(summary["Columns"], ["*"])
+        self.assertEqual(summary["Joins"], ["LeFt JoIn Regions r On s.region_id = r.id"])
+        self.assertEqual(summary["Conditions"], ["r.name = 'East'"])
 
 # Tests summaries with more advanced queries.
 class TestSummarizeQueryAdvanced(unittest.TestCase):
@@ -450,53 +450,38 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         query = "SELECT name, age FROM employees GROUP BY name"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['group_by'], ['name'])
+        self.assertEqual(summary['GROUP BY clauses'], ['name'])
         query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['group_by'], ['department'])
-        self.assertEqual(summary['having'], ['count(*) > 10'])
+        self.assertEqual(summary['GROUP BY clauses'], ['department'])
+        self.assertEqual(summary['HAVING clauses'], ['count(*) > 10'])
 
     # Tests summary involving ORDER BY clause presence.
     def test_order_by(self):
         query = "SELECT name, age FROM employees ORDER BY age DESC"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['order_by'], [('age', 'DESC')])
+        self.assertEqual(summary['ORDER BY clauses'], [('age', 'DESC')])
 
         query = "SELECT name, salary FROM employees ORDER BY salary ASC, name DESC"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['order_by'], [('salary', 'ASC'), ('name', 'DESC')])
+        self.assertEqual(summary['ORDER BY clauses'], [('salary', 'ASC'), ('name', 'DESC')])
 
     # Tests summary involing HAVING clause presence.
     def test_having(self):
         query = "SELECT department, count(*) FROM employees GROUP BY department HAVING count(*) > 10"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['having'], ['count(*) > 10'])
+        self.assertEqual(summary['HAVING clauses'], ['count(*) > 10'])
 
         query = "SELECT department, sum(salary) FROM employees GROUP BY department HAVING sum(salary) > 50000 OR count(*) < 5"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(summary['having'], ['sum(salary) > 50000', 'OR', 'count(*) < 5'])
+        self.assertEqual(summary['HAVING clauses'], ['sum(salary) > 50000', 'OR', 'count(*) < 5'])
 
-    # Tests summary involing LIMIT presence.
-    def test_limit(self):
-        query = "SELECT name FROM employees LIMIT 10"
-        parser = QueryParser(query)
-        summary = parser.summarize_query()
-        self.assertEqual(summary['limit'], 10)
 
-        query = "SELECT name FROM employees LIMIT 10"
-        parser = QueryParser(query)
-        summary = parser.summarize_query()
-        self.assertEqual(summary['limit'], 10)
-
-        query = "SELECT * FROM employees LIMIT 10"
-        parser = QueryParser(query)
-        summary = parser.summarize_query()
-        self.assertEqual(summary['limit'], 10)
 
     # Tests the parsing ability of a complex query involving a conjuntion of multiple additional clauses.
     def test_complex_query(self):
@@ -513,12 +498,13 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         """
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(len(summary['subqueries']), 1)
-        subquery_summary = summary['subqueries'][0]
-        self.assertIn('tables', subquery_summary)
-        self.assertIn('conditions', subquery_summary)
-        self.assertIn('departments', subquery_summary['tables'])
-        self.assertTrue(any("location = 'NY'" in cond for cond in subquery_summary['conditions']))
+        self.assertEqual(len(summary['Subqueries']), 1)
+        subquery_summary = summary['Subqueries'][0]
+        self.assertIn('Tables', subquery_summary)
+        self.assertIn('Conditions', subquery_summary)
+        self.assertIn('departments', subquery_summary['Tables'])
+        self.assertTrue(any("location = 'NY'" in cond for cond in subquery_summary['Conditions']))
+        print(summary)
 
     # Tests summary given a subquery with JOIN.
     def test_subquery_with_joins(self):
@@ -529,32 +515,32 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
         """
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(len(summary['subqueries']), 1)
-        subquery_summary = summary['subqueries'][0]
-        self.assertIn('tables', subquery_summary)
-        self.assertIn('departments', subquery_summary['tables'])
-        self.assertIn('locations', subquery_summary['tables'])
-        self.assertIn('joins', subquery_summary)
-        self.assertTrue(any('JOIN' in join for join in subquery_summary['joins']))
-        self.assertIn('conditions', subquery_summary)
-        self.assertTrue(any("region = 'West'" in cond for cond in subquery_summary['conditions']))
+        self.assertEqual(len(summary['Subqueries']), 1)
+        subquery_summary = summary['Subqueries'][0]
+        self.assertIn('Tables', subquery_summary)
+        self.assertIn('departments', subquery_summary['Tables'])
+        self.assertIn('locations', subquery_summary['Tables'])
+        self.assertIn('Joins', subquery_summary)
+        self.assertTrue(any('JOIN' in join for join in subquery_summary['Joins']))
+        self.assertIn('Conditions', subquery_summary)
+        self.assertTrue(any("region = 'West'" in cond for cond in subquery_summary['Conditions']))
 
     # Tests summary given a multi-nested subquery.
     def test_nested_subqueries(self):
         query = "SELECT name FROM employees WHERE department_id IN (SELECT department_id FROM projects WHERE project_id IN (SELECT project_id FROM budgets WHERE amount > 100000))"
         parser = QueryParser(query)
         summary = parser.summarize_query()
-        self.assertEqual(len(summary['subqueries']), 2)
-        first_level_subquery = summary['subqueries'][0]
-        self.assertIn('tables', first_level_subquery)
-        self.assertIn('projects', first_level_subquery['tables'])
-        nested_subqueries = first_level_subquery.get('subqueries', [])
+        self.assertEqual(len(summary['Subqueries']), 2)
+        first_level_subquery = summary['Subqueries'][0]
+        self.assertIn('Tables', first_level_subquery)
+        self.assertIn('projects', first_level_subquery['Tables'])
+        nested_subqueries = first_level_subquery.get('Subqueries', [])
         self.assertEqual(len(nested_subqueries), 1)
         nested_subquery = nested_subqueries[0]
-        self.assertIn('tables', nested_subquery)
-        self.assertIn('budgets', nested_subquery['tables'])
-        self.assertIn('conditions', nested_subquery)
-        self.assertTrue(any('amount > 100000' in cond for cond in nested_subquery['conditions']))
+        self.assertIn('Tables', nested_subquery)
+        self.assertIn('budgets', nested_subquery['Tables'])
+        self.assertIn('Conditions', nested_subquery)
+        self.assertTrue(any('amount > 100000' in cond for cond in nested_subquery['Conditions']))
         
 
 # Runs the tests. 
