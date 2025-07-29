@@ -7,7 +7,7 @@ _By: Ryan Gallagher_
 
 ## Overview
 
-The **SQL Query Optimization Tool** is a Python-based web application designed to analyze and optimize SQL queries for SQLite databases. It helps developers identify performance inefficiencies by parsing queries, analyzing execution plans, and providing optimal suggestions to improve query efficiency. This tool leverages Flask for the backend, and offers a user-friendly interface built with HTML, CSS, and JavaScript. The performance of this tool has been extensively tested in the respective modules located in the "Tests" file and currently passes 107 test cases covering all components of functionality. 
+The **SQL Query Optimization Tool** is a Python-based web application designed to analyze and optimize SQL queries for SQLite databases. It helps developers identify performance inefficiencies by parsing queries, analyzing execution plans, and providing optimal suggestions to improve query efficiency. This tool leverages Flask for the backend, and offers a user-friendly interface built with HTML, CSS, and JavaScript. The performance of this tool has been extensively tested in the respective modules located in the "Tests" file and currently passes 103 test cases covering all components of functionality. 
 
 ## Features
 
