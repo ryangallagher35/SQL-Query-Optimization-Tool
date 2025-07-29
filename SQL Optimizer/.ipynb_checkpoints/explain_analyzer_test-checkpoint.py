@@ -13,7 +13,7 @@ class TestCheckFullTableScan(unittest.TestCase):
     # Test to see if a full table scan without an index is correctly flagged as a performance issue. 
     def test_full_table_scan_detected(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_full_table_scan()
@@ -25,7 +25,7 @@ class TestCheckFullTableScan(unittest.TestCase):
     # Ensures that scans using an index are not mistakenly flagged as full table scans.
     def test_no_full_table_scan_when_index_used(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users USING INDEX user_idx'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING INDEX user_idx'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_full_table_scan()
@@ -35,7 +35,7 @@ class TestCheckFullTableScan(unittest.TestCase):
     # Tests that the analyzer can handle mixed query plans and only flags actual performance concern.
     def test_mixed_scan_and_search(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users'},
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'},
             {'selectid': 0, 'order': 1, 'from': 1, 'detail': 'SEARCH TABLE orders USING INDEX order_idx'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
@@ -60,7 +60,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Tests if an unnecessary filesort is detected.
     def test_unnecessary_filesort_detected(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users ORDER BY lastname, firstname"
 
@@ -78,7 +78,7 @@ class TestCheckFilesort(unittest.TestCase):
 
     # Test when no ORDER BY clause exists; should not raise any issues.
     def test_no_order_by_clause(self):
-        explain_plan = [{'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users'}]
+        explain_plan = [{'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}]
         raw_query = "SELECT * FROM users"
         schema_index_info = {"USERS": {"idx_lastname_firstname": ["LASTNAME", "FIRSTNAME"]}}
         analyzer = ExplainAnalyzer(explain_plan, raw_query, schema_index_info)
@@ -87,7 +87,7 @@ class TestCheckFilesort(unittest.TestCase):
 
     # Test when ORDER BY is used, but no filesort appears in the explain plan; no issue expected.
     def test_order_by_but_no_filesort(self):
-        explain_plan = [{'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users'}]
+        explain_plan = [{'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}]
         raw_query = "SELECT * FROM users ORDER BY lastname, firstname"
         schema_index_info = {"USERS": {"idx_lastname_firstname": ["LASTNAME", "FIRSTNAME"]}}
         analyzer = ExplainAnalyzer(explain_plan, raw_query, schema_index_info)
@@ -97,7 +97,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Test when filesort occurs but columns are NOT covered by index; no issue should be raised.
     def test_filesort_not_covered_by_index(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN TABLE users USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users ORDER BY lastname, firstname"
         schema_index_info = {"USERS": {"idx_email": ["EMAIL"]}}  # Wrong index
@@ -108,7 +108,7 @@ class TestCheckFilesort(unittest.TestCase):
     # Test when multiple tables exist but table name cannot be inferred; should skip.
     def test_multiple_tables_unknown_target(self):
         explain_plan = [
-            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USING TEMP B-TREE FOR ORDER BY'}
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users JOIN orders ON users.id = orders.user_id ORDER BY users.lastname"
         schema_index_info = {
@@ -135,26 +135,26 @@ class TestCheckFilesort(unittest.TestCase):
         self.assertEqual(analyzer.issues[0]['type'], 'Unnecessary Filesort')
 
    
-
 class TestUnindexedJoin(unittest.TestCase):
     
     # Test that an unindexed JOIN is detected when both tables are scanned
     def test_detects_unindexed_join(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
             {'detail': 'LOOP JOIN customers'},
-            {'detail': 'SCAN TABLE customers'}
+            {'detail': 'SCAN customers'}
         ]
+ 
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
         self.assertEqual(len(analyzer.issues), 1)
         self.assertEqual(analyzer.issues[0]['type'], 'Unindexed JOIN')
         self.assertIn('customers', analyzer.issues[0]['message'].lower())
+        
 
     # Test that JOIN using an index is NOT flagged
     def test_indexed_join_not_flagged(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'SCAN orders'},
             {'detail': 'LOOP JOIN customers'},
             {'detail': 'SEARCH TABLE customers USING INDEX customer_idx (customer_id=?)'}
         ]
@@ -166,7 +166,7 @@ class TestUnindexedJoin(unittest.TestCase):
     # Test that JOIN using INTEGER PRIMARY KEY is NOT flagged
     def test_join_using_integer_primary_key_not_flagged(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'SCAN orders'},
             {'detail': 'LOOP JOIN customers'},
             {'detail': 'SEARCH TABLE customers USING INTEGER PRIMARY KEY (rowid=?)'}
         ]
@@ -177,8 +177,8 @@ class TestUnindexedJoin(unittest.TestCase):
     # Test that no JOIN results in no issues, even if SCAN is used
     def test_no_join_no_issue(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
-            {'detail': 'SCAN TABLE customers'}
+            {'detail': 'SCAN orders'},
+            {'detail': 'SCAN customers'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
@@ -187,11 +187,11 @@ class TestUnindexedJoin(unittest.TestCase):
     # Test that multiple unindexed joins are both flagged
     def test_multiple_unindexed_joins_flagged(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'SCAN orders'},
             {'detail': 'LOOP JOIN customers'},
-            {'detail': 'SCAN TABLE customers'},
+            {'detail': 'SCAN customers'},
             {'detail': 'LOOP JOIN products'},
-            {'detail': 'SCAN TABLE products'}
+            {'detail': 'SCAN products'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer._check_unindexed_join()
@@ -203,7 +203,7 @@ class TestUnindexedJoin(unittest.TestCase):
     # Test JOIN listed but missing table access row — should be flagged as unknown
     def test_join_with_missing_access_info(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE orders'},
+            {'detail': 'SCAN orders'},
             {'detail': 'LOOP JOIN customers'}
             # no access row for customers
         ]
@@ -247,7 +247,7 @@ class TestInefficientOrConditions(unittest.TestCase):
     # Tests inefficient OR instance amidst a full table scan.
     def test_or_with_full_table_scan_detected(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE users'}
+            {'detail': 'SCAN users'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
@@ -268,7 +268,7 @@ class TestInefficientOrConditions(unittest.TestCase):
     # Tests instance where no "OR" clause appears, protects against false positives.
     def test_no_or_clause(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE users'}
+            {'detail': 'SCAN users'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A'"
@@ -289,7 +289,7 @@ class TestInefficientOrConditions(unittest.TestCase):
     def test_or_with_partial_index_usage(self):
         explain_plan = [
             {'detail': 'SEARCH TABLE users USING INDEX user_name_idx'},
-            {'detail': 'SCAN TABLE users'}
+            {'detail': 'SCAN users'}
         ]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
@@ -298,7 +298,7 @@ class TestInefficientOrConditions(unittest.TestCase):
 
     # Test: Malformed query still containing OR should be flagged based on plan
     def test_or_with_malformed_query(self):
-        explain_plan = [{'detail': 'SCAN TABLE users'}]
+        explain_plan = [{'detail': 'SCAN users'}]
         analyzer = ExplainAnalyzer(explain_plan)
         analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR"
         analyzer._check_inefficient_or_conditions()
@@ -330,10 +330,10 @@ class TestExplainAnalyzer(unittest.TestCase):
     # Ensures all checks are triggered.
     def test_all_checks_triggered(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE users'},  
-            {'detail': 'SCAN TABLE customers'},  
+            {'detail': 'SCAN users USING TEMP B-TREE FOR ORDER BY'},
+            {'detail': 'SCAN users'},  
+            {'detail': 'SCAN customers'},  
             {'detail': 'LOOP JOIN customers'},
-            {'detail': 'SCAN TABLE users USING TEMP B-TREE FOR ORDER BY'}  
         ]
         raw_query = """
             SELECT * FROM users 
@@ -380,7 +380,7 @@ class TestExplainAnalyzer(unittest.TestCase):
     # Tests whether a subset of the issues occur.
     def test_partial_issues_detected(self):
         explain_plan = [
-            {'detail': 'SCAN TABLE users'},
+            {'detail': 'SCAN users'},
             {'detail': 'USING TEMP B-TREE FOR ORDER BY'}
         ]
         raw_query = "SELECT * FROM users WHERE email LIKE '%gmail.com%' ORDER BY lastname"
@@ -400,23 +400,25 @@ class TestExplainAnalyzer(unittest.TestCase):
 
 
 # Run the tests.
+runner = unittest.TextTestRunner(verbosity = 2, buffer = False) 
+
 suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
-unittest.TextTestRunner(verbosity = 2).run(suite1)
+runner.run(suite1)
 
 suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
-unittest.TextTestRunner(verbosity = 2).run(suite2)
+runner.run(suite2)
 
 suite3 = unittest.TestLoader().loadTestsFromTestCase(TestUnindexedJoin)
-unittest.TextTestRunner(verbosity = 2).run(suite3)
+runner.run(suite3)
 
 suite4 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
-unittest.TextTestRunner(verbosity = 2).run(suite4)
+runner.run(suite4)
 
 suite5 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
-unittest.TextTestRunner(verbosity = 2).run(suite5)
+runner.run(suite5)
 
 suite6 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
-unittest.TextTestRunner(verbosity = 2).run(suite6)
+runner.run(suite6)
 
 suite7 = unittest.TestLoader().loadTestsFromTestCase(TestExplainAnalyzer)
-unittest.TextTestRunner(verbosity = 2).run(suite7)
+runner.run(suite7)

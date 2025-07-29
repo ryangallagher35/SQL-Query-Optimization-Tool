@@ -49,7 +49,7 @@ class ExplainAnalyzer:
     def _check_full_table_scan(self):
         for row in self.explain_plan:
             detail = row.get("detail", "").upper()
-            if "SCAN TABLE" in detail and "INDEX" not in detail:
+            if "SCAN" in detail and "INDEX" not in detail:
                 self.issues.append({
                     "type": "Full Table Scan",
                     "message": f"Query performs full scan: '{row['detail']}'"
@@ -69,8 +69,8 @@ class ExplainAnalyzer:
             if "USING TEMP B-TREE FOR ORDER BY" in detail:
         
                 table_name = None
-                if "TABLE" in detail:
-                    parts = detail.split("TABLE")
+                if "SCAN" in detail:
+                    parts = detail.split("SCAN")
                     if len(parts) > 1:
                         table_name = parts[1].split()[0].strip()
 
@@ -87,6 +87,7 @@ class ExplainAnalyzer:
                         "message": f"Temp B-tree used for ORDER BY on '{table_name}', but ORDER BY columns appear to be index-covered: '{row['detail']}'"
                     })
 
+    
     # Checks if the columns used in an ORDER BY clause are covered by any existing index, in correct order.
     def _order_by_covered_by_index(self, order_by_cols, index_dict):
         for indexed_cols in index_dict.values():
@@ -94,41 +95,36 @@ class ExplainAnalyzer:
                 return True
         return False
 
+
     # Detects unindexed joins in SQL statements.
     def _check_unindexed_join(self):
-        join_tables = set()
-        access_info = {}
-        
-        for row in self.explain_plan:
-            detail = row.get("detail", "").upper()
-
-
-            if "JOIN" in detail:
+        for i, row in enumerate(self.explain_plan):
+            detail = row.get('detail', '')
+            if detail.startswith('LOOP JOIN'):
                 parts = detail.split()
-                for i, word in enumerate(parts):
-                    if word.endswith("JOIN") and i + 1 < len(parts):
-                        join_tables.add(parts[i + 1])
-            
-            
-            if "TABLE" in detail:
-                table_name = None
-                if "SCAN TABLE" in detail:
-                    table_name = detail.split("SCAN TABLE")[1].split()[0]
-                    access_info[table_name] = "SCAN"
-                elif "SEARCH TABLE" in detail:
-                    table_name = detail.split("SEARCH TABLE")[1].split()[0]
-                    if "USING INDEX" in detail or "USING COVERING INDEX" in detail or "USING INTEGER PRIMARY KEY" in detail:
-                        access_info[table_name] = "INDEXED"
-                    else:
-                        access_info[table_name] = "UNINDEXED_SEARCH"
-        
-        for table in join_tables:
-            access = access_info.get(table, "UNKNOWN")
-            if access != "INDEXED":
-                self.issues.append({
-                    "type": "Unindexed JOIN",
-                    "message": f"JOIN on table '{table}' without index (access: {access})"
-                })
+                if len(parts) >= 3:
+                    join_table = parts[2]
+    
+                    found_access = False
+                    for j in range(i + 1, len(self.explain_plan)):
+                        access_detail = self.explain_plan[j].get('detail', '')
+                        if join_table not in access_detail:
+                            continue
+    
+                        if access_detail.startswith('SEARCH') and (
+                            'USING INDEX' in access_detail or 'USING INTEGER PRIMARY KEY' in access_detail):
+                            found_access = True
+                            break
+                        elif access_detail.startswith('SCAN') and join_table in access_detail:
+                            found_access = False
+                            break
+    
+                    if not found_access:
+                        self.issues.append({
+                            'type': 'Unindexed JOIN',
+                            'message': f'Unindexed JOIN detected on table "{join_table}".'
+                        })
+      
 
     # Detects inefficiencies surrounding the "LIKE" clause.
     def _check_like_without_index(self):
@@ -147,7 +143,7 @@ class ExplainAnalyzer:
         if re.search(r'\bOR\b', self.raw_query, re.IGNORECASE):
             for row in self.explain_plan:
                 detail = row.get("detail", "").upper()
-                if ("SCAN TABLE" in detail) and ("INDEX" not in detail):
+                if ("SCAN" in detail) and ("INDEX" not in detail):
                     self.issues.append({
                         "type": "Inefficient OR Conditions",
                         "message": "OR condition detected that may prevent index usage."

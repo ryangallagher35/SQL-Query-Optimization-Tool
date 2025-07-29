@@ -559,7 +559,6 @@ class TestSummarizeQueryAdvanced(unittest.TestCase):
 
 # Runs the tests. 
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetTables))
-'''
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetColumns))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetJoins))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetConditions))
@@ -569,4 +568,3 @@ unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGe
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestGetLimit))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQuery))
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSummarizeQueryAdvanced))
-'''
