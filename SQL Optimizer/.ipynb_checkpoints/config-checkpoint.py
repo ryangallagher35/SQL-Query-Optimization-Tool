@@ -15,6 +15,7 @@ OPTIMIZATION_THRESHOLDS = {
     "like_without_index": True,          
     "inefficient_or_conditions": True,   
     "functions_on_indexed_columns": True, 
-    "distinct_without_index" : True
+    "distinct_without_index" : True, 
+    "missing_index_on_join" : True
 } 
 

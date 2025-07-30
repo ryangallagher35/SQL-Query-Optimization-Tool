@@ -26,12 +26,14 @@ class Suggestions:
 
             elif issue_type == "Unnecessary Filesort":
                 suggestions.append(
-                    "SQLite is using a filesort unnecessarily, which reduces the performance of the query. Consider adding an index for this operation"
+                    "The query performs a sort operation using a temporary B-tree (filesort) without utilizing an index. "
+                    "Consider creating an index on the column(s) used in the ORDER BY clause to avoid this inefficiency."
                 )
 
             elif issue_type == "Inefficient GROUP BY":
                 suggestions.append(
-                    "SQLite is using a temporary B-tree for GROUP BY, consider adding an index for this operation."
+                     "SQLite is using a temporary B-tree for GROUP BY, which indicates an index is not being used. "
+                    "Add an index on the GROUP BY columns to improve performance."
                 )
 
     
@@ -52,6 +54,12 @@ class Suggestions:
                     "Functions are applied to columns in the WHERE clause, which disables index use. "
                     "Consider rewriting conditions to compare raw column values directly when possible."
                 )
+
+            elif issue_type == "DISTINCT Without Index":
+            suggestions.append(
+                "The DISTINCT clause is used, but no index is present to support it. "
+                "Consider adding an index on the column(s) used with DISTINCT to avoid unnecessary sorting or deduplication overhead."
+            )
 
             else:
                 suggestions.append(f"No specific suggestion available for issue: {message}")
