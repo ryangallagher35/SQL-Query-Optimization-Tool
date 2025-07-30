@@ -38,6 +38,9 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("distinct_without_index"):
             self._check_distinct_without_index()
 
+        if OPTIMIZATION_THRESHOLDS.get("missing_index_on_join"):
+            self._check_missing_index_on_join()
+
         return {
             "issues_detected": self.issues,
             "total_issues": len(self.issues)

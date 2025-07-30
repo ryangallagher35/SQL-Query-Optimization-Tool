@@ -82,8 +82,7 @@ class ExplainAnalyzer:
     
     # Detects inefficiencies surrounding the "LIKE" clause.
     def _check_like_without_index(self):
-        like_patterns = re.findall(r"LIKE\s+['\"](.*?)['\"]", self.raw_query, flags=re.IGNORECASE)
-        
+        like_patterns = re.findall(r"LIKE\s+['\"](.*?)['\"]", self.raw_query, flags = re.IGNORECASE)
         for pattern in like_patterns:
             if pattern.startswith('%'):
                 self.issues.append({
