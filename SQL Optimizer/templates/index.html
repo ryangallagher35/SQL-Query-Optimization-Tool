@@ -112,7 +112,7 @@
                 resultDiv.innerHTML += "<p>No summary available.</p>";
             }
 
-            resultDiv.innerHTML += `<h2>Detected Issues</h2>`;
+            resultDiv.innerHTML += `<h2>Warnings</h2>`;
             if (result.issues.length > 0) {
                 result.issues.forEach(i => {
                     resultDiv.innerHTML += `<p><b>${i.type}</b>: ${i.message}</p>`;

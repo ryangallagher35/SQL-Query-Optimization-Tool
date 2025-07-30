@@ -10,10 +10,11 @@ DB_CONFIG = {
 # Optimization thresholds defined here. 
 OPTIMIZATION_THRESHOLDS = { 
     "full_table_scan" : True,
-    "unnecessary_filesort" : True, 
-    "unindexed_join": True,                    
+    "unnecessary_filesort" : True,    
+    "inefficient GROUP BY" : True,
     "like_without_index": True,          
     "inefficient_or_conditions": True,   
-    "functions_on_indexed_columns": True
+    "functions_on_indexed_columns": True, 
+    "distinct_without_index" : True
 } 
 

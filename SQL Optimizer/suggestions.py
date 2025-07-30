@@ -21,21 +21,20 @@ class Suggestions:
             if issue_type == "Full Table Scan":
                 suggestions.append(
                     "The query performs a full table scan without using any index. "
-                    "Consider adding indexes on columns used in WHERE or JOIN conditions to avoid full scans."
+                    "Consider adding indexes to avoid full table scans."
                 )
 
             elif issue_type == "Unnecessary Filesort":
                 suggestions.append(
-                    "SQLite is using a temporary B-tree for ORDER BY, even though an index might cover the sort columns. "
-                    "Ensure ORDER BY columns match the leading columns of an available index in order."
+                    "SQLite is using a filesort unnecessarily, which reduces the performance of the query. Consider adding an index for this operation"
                 )
 
-            elif issue_type == "Unindexed JOIN":
+            elif issue_type == "Inefficient GROUP BY":
                 suggestions.append(
-                    "A JOIN operation is being executed without using an index on the joined column. "
-                    "Consider adding indexes on columns used in JOIN conditions to reduce scan costs."
+                    "SQLite is using a temporary B-tree for GROUP BY, consider adding an index for this operation."
                 )
 
+    
             elif issue_type == "LIKE without index":
                 suggestions.append(
                     "A LIKE clause uses a leading wildcard (e.g., '%value'), which prevents index usage. "
@@ -58,6 +57,6 @@ class Suggestions:
                 suggestions.append(f"No specific suggestion available for issue: {message}")
 
         if not suggestions:
-            suggestions.append("No issues detected. Query appears to be optimized based on current thresholds.")
+            suggestions.append("No issues detected, query appears to be optimized.")
 
         return suggestions

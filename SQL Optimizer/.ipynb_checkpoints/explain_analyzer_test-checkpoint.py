@@ -7,7 +7,6 @@ import unittest
 from unittest.mock import patch
 from explain_analyzer import ExplainAnalyzer
 
-# Testing suite for _check_full_tables_scan method. 
 class TestCheckFullTableScan(unittest.TestCase):
 
     # Test to see if a full table scan without an index is correctly flagged as a performance issue. 
@@ -127,6 +126,64 @@ class TestCheckFilesort(unittest.TestCase):
 
         self.assertEqual(len(analyzer.issues), 0)
 
+class TestInefficientGroupBy(unittest.TestCase): 
+
+    # Tests that an inefficient GROUP BY using a temporary B-Tree is correctly flagged.
+    def test_inefficient_group_by_detected(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Inefficient GROUP BY')
+        self.assertIn('GROUP BY', analyzer.issues[0]['message'])
+
+    # Ensures that a GROUP BY using an index is not incorrectly flagged as inefficient.
+    def test_efficient_group_by_with_index(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH sales USING INDEX sales_idx'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Ensures that non-GROUP BY steps do not raise false positives.
+    def test_no_group_by_present(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN products'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Detects that inefficient GROUP BY is flagged only if no index was seen before it.
+    def test_group_by_without_prior_index(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'SEARCH customers USING INDEX cust_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Inefficient GROUP BY')
+
+    # Ensures that if an index is seen first, a later TEMP B-TREE GROUP BY is not flagged.
+    def test_index_seen_before_group_by(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH inventory USING INDEX inv_idx'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
 class TestLikeWithoutIndex(unittest.TestCase):
 
     # Tests leading wildcard instance, should yield an issue.
@@ -239,6 +296,54 @@ class TestFunctionsOnIndexedColumns(unittest.TestCase):
         analyzer._check_functions_on_indexed_columns()
         self.assertEqual(len(analyzer.issues), 0)
 
+class TestDistinctWithoutIndex(unittest.TestCase):
+
+    # Test to ensure DISTINCT without index is flagged as a performance issue.
+    def test_distinct_without_index_detected(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'DISTINCT Without Index')
+        self.assertIn('DISTINCT clause', analyzer.issues[0]['message'])
+
+    # Ensures that DISTINCT with a detected index is not flagged.
+    def test_distinct_with_index_not_flagged(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Tests that a query without DISTINCT does not trigger any issue.
+    def test_no_distinct_clause(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH users USING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test to ensure case insensitivity in index detection.
+    def test_distinct_with_covering_index_uppercase(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH users USING COVERING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
 class TestExplainAnalyzer(unittest.TestCase):
     
     # Ensures all checks are triggered.
@@ -309,14 +414,20 @@ runner.run(suite1)
 suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
 runner.run(suite2)
 
-suite3 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
+suite3 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientGroupBy)
 runner.run(suite3)
 
-suite4 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
+suite4 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
 runner.run(suite4)
 
-suite5 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
+suite5 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
 runner.run(suite5)
 
-suite6 = unittest.TestLoader().loadTestsFromTestCase(TestExplainAnalyzer)
+suite6 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
 runner.run(suite6)
+
+suite7 = unittest.TestLoader().loadTestsFromTestCase(TestDistinctWithoutIndex)
+runner.run(suite7)
+
+suite8 = unittest.TestLoader().loadTestsFromTestCase(TestExplainAnalyzer)
+runner.run(suite8)

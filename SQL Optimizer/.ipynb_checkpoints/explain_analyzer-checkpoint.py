@@ -23,11 +23,8 @@ class ExplainAnalyzer:
         if OPTIMIZATION_THRESHOLDS.get("unnecessary_filesort"):
             self._check_unnecessary_filesort() 
 
-        if OPTIMIZATION_THRESHOLDS.get("unindexed_join"):
-            self._check_unindexed_join()
-
-        if OPTIMIZATION_THRESHOLDS.get("unnecessary_subquery"):
-            self._check_unnecessary_subquery()
+        if OPTIMIZATION_THRESHOLDS.get("inefficient GROUP BY"):
+            self._check_inefficient_group_by() 
 
         if OPTIMIZATION_THRESHOLDS.get("like_without_index"):
             self._check_like_without_index()
@@ -37,6 +34,9 @@ class ExplainAnalyzer:
 
         if OPTIMIZATION_THRESHOLDS.get("functions_on_indexed_columns"):
             self._check_functions_on_indexed_columns()
+
+        if OPTIMIZATION_THRESHOLDS.get("distinct_without_index"):
+            self._check_distinct_without_index()
 
         return {
             "issues_detected": self.issues,
@@ -50,7 +50,7 @@ class ExplainAnalyzer:
             if "SCAN" in detail and "USING INDEX" not in detail:
                 self.issues.append({
                     "type": "Full Table Scan",
-                    "message": f"Query performs full scan: '{row['detail']}'"
+                    "message": f"Query performs full table scan: '{row['detail']}'"
                 })
             
     # Heuristically detect potential use of filesort.
@@ -64,6 +64,19 @@ class ExplainAnalyzer:
                 self.issues.append({
                     "type": "Unnecessary Filesort",
                     "message": f"Query may be using an unnecessary filesort: '{row['detail']}'"
+                })
+
+    # Detects inefficient GROUP BY statements that yield temporary B-Trees.
+    def _check_inefficient_group_by(self):
+        index_seen = False
+        for row in self.explain_plan:
+            detail = row.get("detail", "").upper()
+            if "USING INDEX" in detail:
+                index_seen = True
+            if "USE TEMP B-TREE FOR GROUP BY" in detail and not index_seen:
+                self.issues.append({
+                    "type": "Inefficient GROUP BY",
+                    "message": f"Query may be using a temporary B-Tree for the GROUP BY Clause: '{row['detail']}'"
                 })
 
     
@@ -102,3 +115,17 @@ class ExplainAnalyzer:
                 "type": "Functions on Indexed Columns",
                 "message": f"Functions used in WHERE clause may disable index usage: {func_calls}"
             })
+
+    # Detects if DISTINCT is used without an index, which can lead to inefficient execution
+    def _check_distinct_without_index(self):
+        if "DISTINCT" in self.raw_query:
+            index_used = any(
+                "INDEX" in row.get("detail", "").upper() or
+                "USING" in row.get("detail", "").upper()
+                for row in self.explain_plan
+            )
+            if not index_used:
+                self.issues.append({
+                    "type": "DISTINCT Without Index",
+                    "message": "DISTINCT clause is used but no index was detected in the query plan."
+                })
