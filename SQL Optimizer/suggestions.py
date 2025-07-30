@@ -56,7 +56,7 @@ class Suggestions:
                 )
 
             elif issue_type == "DISTINCT Without Index":
-            suggestions.append(
+                suggestions.append(
                 "The DISTINCT clause is used, but no index is present to support it. "
                 "Consider adding an index on the column(s) used with DISTINCT to avoid unnecessary sorting or deduplication overhead."
             )
