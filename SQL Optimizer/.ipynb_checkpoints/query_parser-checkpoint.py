@@ -175,7 +175,6 @@ class QueryParser:
         
         return joins
     
-    
     # Returns the conditions specified by the WHERE clause.
     def get_conditions(self):
         conditions = []
@@ -394,6 +393,7 @@ class QueryParser:
             "ORDER BY clauses" : self.get_order_by(), 
             "GROUP BY clauses" : self.get_group_by(), 
             "HAVING clauses" : self.get_having(), 
+            "Limit" : self.get_limit(),
             "Subqueries" : self.get_subqueries()
         }
 
