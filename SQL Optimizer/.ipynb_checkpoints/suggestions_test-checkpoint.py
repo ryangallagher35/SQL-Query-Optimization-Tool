@@ -64,6 +64,27 @@ class TestSuggestions(unittest.TestCase):
         result = sugg.generate_suggestions()
         self.assertTrue(any("raw" in s.lower() for s in result))
 
+ # Tests the presence of inefficient GROUP BY usage.
+    def test_inefficient_group_by_suggestion(self):
+        issues = [{"type": "Inefficient GROUP BY", "message": "GROUP BY uses temp B-tree"}]
+        sugg = Suggestions(issues)
+        result = sugg.generate_suggestions()
+        self.assertTrue(any("group by" in s.lower() and "index" in s.lower() for s in result))
+
+    # Tests the presence of DISTINCT without supporting index.
+    def test_distinct_without_index_suggestion(self):
+        issues = [{"type": "DISTINCT Without Index", "message": "DISTINCT used without index"}]
+        sugg = Suggestions(issues)
+        result = sugg.generate_suggestions()
+        self.assertTrue(any("distinct" in s.lower() and "index" in s.lower() for s in result))
+
+    # Fix the filesort test to match the actual issue type expected.
+    def test_unnecessary_filesort_suggestion(self):
+        issues = [{"type": "Unnecessary Filesort", "message": "Filesort operation detected"}]
+        sugg = Suggestions(issues)
+        result = sugg.generate_suggestions()
+        self.assertTrue(any("filesort" in s.lower() for s in result))
+
 
 # Run the tests.
 unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestSuggestions))

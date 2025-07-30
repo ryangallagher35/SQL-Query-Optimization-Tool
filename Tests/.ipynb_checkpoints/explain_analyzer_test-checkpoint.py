@@ -1,0 +1,433 @@
+# Ryan Gallagher
+# SQL Query Optimization Tool 
+# explain_analyzer_test.py
+
+# Resource importing and management. 
+import unittest 
+from unittest.mock import patch
+from explain_analyzer import ExplainAnalyzer
+
+class TestCheckFullTableScan(unittest.TestCase):
+
+    # Test to see if a full table scan without an index is correctly flagged as a performance issue. 
+    def test_full_table_scan_detected(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_full_table_scan()
+        
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Full Table Scan')
+        self.assertIn('users', analyzer.issues[0]['message'])
+
+    # Ensures that scans using an index are not mistakenly flagged as full table scans.
+    def test_no_full_table_scan_when_index_used(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING INDEX user_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_full_table_scan()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Tests that the analyzer can handle mixed query plans and only flags actual performance concern.
+    def test_mixed_scan_and_search(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'},
+            {'selectid': 0, 'order': 1, 'from': 1, 'detail': 'SEARCH orders USING INDEX order_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_full_table_scan()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Full Table Scan')
+
+    # Verifies that efficient query structures don't yield false positives.
+    def test_no_scan_present(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH products USING INDEX product_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_full_table_scan()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+
+class TestCheckFilesort(unittest.TestCase):
+
+    # Flags a filesort when "USE TEMP B-TREE FOR ORDER BY" is present and no index is used
+    def test_detects_unnecessary_filesort(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR ORDER BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Unnecessary Filesort')
+        self.assertIn('filesort', analyzer.issues[0]['message'].lower())
+
+    # Does not flag a filesort when an index is clearly used in the same step
+    def test_filesort_with_index_not_flagged(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0,
+             'detail': 'SCAN users USING INDEX user_idx'}, 
+            {'selectid':1, 'order' : 0, 'from': 0, 'detail' : 'USE TEMP B-TREE FOR ORDER BY '}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Handles plans where filesort text is completely absent
+    def test_no_filesort_present(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0,
+             'detail': 'SEARCH users USING INDEX user_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Handles mixed plan where one step uses unnecessary filesort and another does not
+    def test_mixed_filesort_and_indexed(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR ORDER BY'},
+            {'selectid': 0, 'order': 1, 'from': 1,
+             'detail': 'SEARCH products USING INDEX product_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Unnecessary Filesort')
+
+    # Verifies case insensitivity in detail text
+    def test_case_insensitive_filesort_detection(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'use temp b-tree for order by'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertIn('Unnecessary Filesort', analyzer.issues[0]['type'])
+
+    # Ensures that unrelated temp B-tree usage is not misclassified
+    def test_non_orderby_temp_btree_not_flagged(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0,
+             'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_unnecessary_filesort()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+class TestInefficientGroupBy(unittest.TestCase): 
+
+    # Tests that an inefficient GROUP BY using a temporary B-Tree is correctly flagged.
+    def test_inefficient_group_by_detected(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Inefficient GROUP BY')
+        self.assertIn('GROUP BY', analyzer.issues[0]['message'])
+
+    # Ensures that a GROUP BY using an index is not incorrectly flagged as inefficient.
+    def test_efficient_group_by_with_index(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH sales USING INDEX sales_idx'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Ensures that non-GROUP BY steps do not raise false positives.
+    def test_no_group_by_present(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN products'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Detects that inefficient GROUP BY is flagged only if no index was seen before it.
+    def test_group_by_without_prior_index(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'SEARCH customers USING INDEX cust_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Inefficient GROUP BY')
+
+    # Ensures that if an index is seen first, a later TEMP B-TREE GROUP BY is not flagged.
+    def test_index_seen_before_group_by(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH inventory USING INDEX inv_idx'},
+            {'selectid': 0, 'order': 1, 'from': 0, 'detail': 'USE TEMP B-TREE FOR GROUP BY'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer._check_inefficient_group_by()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+class TestLikeWithoutIndex(unittest.TestCase):
+
+    # Tests leading wildcard instance, should yield an issue.
+    def test_leading_wildcard_like_flagged(self):
+        explain_plan = []
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name LIKE '%john%'"
+        analyzer._check_like_without_index()
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'LIKE without index')
+        self.assertIn('%john%', analyzer.issues[0]['message'])
+
+    # Tests lack of leading wildcard instance, should not yield and issue.
+    def test_no_leading_wildcard_not_flagged(self):
+        explain_plan = []
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name LIKE 'john%'"
+        analyzer._check_like_without_index()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Tests instance where "LIKE" clause doesn't appear, ensures false positives do not occur.
+    def test_like_clause_missing(self):
+        explain_plan = []
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'john'"
+        analyzer._check_like_without_index()
+        self.assertEqual(len(analyzer.issues), 0)
+
+
+class TestInefficientOrConditions(unittest.TestCase):
+
+    # Tests inefficient OR instance amidst a full table scan.
+    def test_or_with_full_table_scan_detected(self):
+        explain_plan = [
+            {'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Inefficient OR Conditions')
+
+    # Tests efficient OR instance where an index is used, should not yield any issues.
+    def test_or_with_index_not_flagged(self):
+        explain_plan = [
+            {'detail': 'SEARCH users USING INDEX user_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Tests instance where no "OR" clause appears, protects against false positives.
+    def test_no_or_clause(self):
+        explain_plan = [
+            {'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test: OR condition on same column using index should not be flagged
+    def test_or_on_same_indexed_column(self):
+        explain_plan = [
+            {'detail': 'SEARCH users USING INDEX user_name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR name = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test: Mixed plan — one using index, one full scan — should still be flagged
+    def test_or_with_partial_index_usage(self):
+        explain_plan = [
+            {'detail': 'SEARCH users USING INDEX user_name_idx'},
+            {'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR email = 'B'"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 1)
+
+    # Test: Malformed query still containing OR should be flagged based on plan
+    def test_or_with_malformed_query(self):
+        explain_plan = [{'detail': 'SCAN users'}]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'A' OR"
+        analyzer._check_inefficient_or_conditions()
+        self.assertEqual(len(analyzer.issues), 1)
+
+
+class TestFunctionsOnIndexedColumns(unittest.TestCase):
+
+    # Tests a function in WHERE clause that would negate an index.
+    def test_detects_function_in_where_clause(self):
+        explain_plan = []
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE LOWER(name) = 'john'"
+        analyzer._check_functions_on_indexed_columns()
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'Functions on Indexed Columns')
+        self.assertIn('LOWER(name)', str(analyzer.issues[0]['message']))
+
+    # Ensures false positives do not occur when no function occurs in WHERE clause.
+    def test_no_function_in_where_clause(self):
+        explain_plan = []
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT * FROM users WHERE name = 'john'"
+        analyzer._check_functions_on_indexed_columns()
+        self.assertEqual(len(analyzer.issues), 0)
+
+class TestDistinctWithoutIndex(unittest.TestCase):
+
+    # Test to ensure DISTINCT without index is flagged as a performance issue.
+    def test_distinct_without_index_detected(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 1)
+        self.assertEqual(analyzer.issues[0]['type'], 'DISTINCT Without Index')
+        self.assertIn('DISTINCT clause', analyzer.issues[0]['message'])
+
+    # Ensures that DISTINCT with a detected index is not flagged.
+    def test_distinct_with_index_not_flagged(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SCAN users USING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Tests that a query without DISTINCT does not trigger any issue.
+    def test_no_distinct_clause(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH users USING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+    # Test to ensure case insensitivity in index detection.
+    def test_distinct_with_covering_index_uppercase(self):
+        explain_plan = [
+            {'selectid': 0, 'order': 0, 'from': 0, 'detail': 'SEARCH users USING COVERING INDEX name_idx'}
+        ]
+        analyzer = ExplainAnalyzer(explain_plan)
+        analyzer.raw_query = "SELECT DISTINCT name FROM users"
+        analyzer._check_distinct_without_index()
+
+        self.assertEqual(len(analyzer.issues), 0)
+
+class TestExplainAnalyzer(unittest.TestCase):
+    
+    # Ensures all checks are triggered.
+    def test_all_checks_triggered(self):
+        explain_plan = [
+            {'detail': 'SCAN users'},  
+            {'detail': 'USE TEMP B-TREE FOR ORDER BY'},
+            {'detail': 'SCAN customers'}
+        ]
+        raw_query = """
+            SELECT * FROM users 
+            JOIN customers ON users.id = customers.user_id 
+            WHERE LOWER(name) = 'john' OR email LIKE '%example.com%' 
+            ORDER BY lastname, firstname
+        """
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query)
+        result = analyzer.analyze()
+
+        issue_types = [issue['type'] for issue in result['issues_detected']]
+
+        self.assertIn('Full Table Scan', issue_types)
+        self.assertIn('Unnecessary Filesort', issue_types)
+        self.assertIn('Functions on Indexed Columns', issue_types)
+        self.assertIn('LIKE without index', issue_types)
+        self.assertIn('Inefficient OR Conditions', issue_types)
+        self.assertEqual(result['total_issues'], 6)
+
+    # Ensures no issues are detected.
+    def test_no_issues_detected(self):
+        explain_plan = [
+            {'detail': 'SEARCH users USING INDEX user_idx'},
+            {'detail': 'SEARCH customers USING INDEX cust_idx'},
+        ]
+        raw_query = "SELECT * FROM users JOIN customers ON users.id = customers.user_id WHERE name = 'John' ORDER BY lastname"
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query)
+        result = analyzer.analyze()
+
+        self.assertEqual(result['total_issues'], 0)
+        self.assertEqual(result['issues_detected'], [])
+
+    # Tests whether a subset of the issues occur.
+    def test_partial_issues_detected(self):
+        explain_plan = [
+            {'detail': 'SCAN users'},
+            {'detail': 'USE TEMP B-TREE FOR ORDER BY'}
+        ]
+        raw_query = "SELECT * FROM users WHERE email LIKE '%gmail.com%' ORDER BY lastname"
+
+        analyzer = ExplainAnalyzer(explain_plan, raw_query)
+        result = analyzer.analyze()
+
+        issue_types = [issue['type'] for issue in result['issues_detected']]
+
+        self.assertIn('Full Table Scan', issue_types)
+        self.assertIn('Unnecessary Filesort', issue_types)
+        self.assertIn('LIKE without index', issue_types)
+        self.assertEqual(result['total_issues'], 3)
+
+
+# Run the tests.
+runner = unittest.TextTestRunner(verbosity = 2, buffer = False) 
+
+suite1 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFullTableScan)
+runner.run(suite1)
+
+suite2 = unittest.TestLoader().loadTestsFromTestCase(TestCheckFilesort)
+runner.run(suite2)
+
+suite3 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientGroupBy)
+runner.run(suite3)
+
+suite4 = unittest.TestLoader().loadTestsFromTestCase(TestLikeWithoutIndex)
+runner.run(suite4)
+
+suite5 = unittest.TestLoader().loadTestsFromTestCase(TestInefficientOrConditions)
+runner.run(suite5)
+
+suite6 = unittest.TestLoader().loadTestsFromTestCase(TestFunctionsOnIndexedColumns)
+runner.run(suite6)
+
+suite7 = unittest.TestLoader().loadTestsFromTestCase(TestDistinctWithoutIndex)
+runner.run(suite7)
+
+suite8 = unittest.TestLoader().loadTestsFromTestCase(TestExplainAnalyzer)
+runner.run(suite8)
