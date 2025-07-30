@@ -7,13 +7,13 @@ _By: Ryan Gallagher_
 
 ## Overview
 
-The **SQL Query Optimization Tool** is a Python-based web application designed to analyze and optimize SQL queries for SQLite databases. It helps developers identify performance inefficiencies by parsing queries, analyzing execution plans, and providing optimal suggestions to improve query efficiency. This tool leverages Flask for the backend, and offers a user-friendly interface built with HTML, CSS, and JavaScript. The performance of this tool has been extensively tested in the respective modules located in the "Tests" file and currently passes 103 test cases covering all components of functionality. 
+The **SQL Query Optimization Tool** is a Python-based web application designed to analyze and optimize SQL queries for SQLite databases. It helps developers identify performance inefficiencies by parsing queries, analyzing execution plans, and providing optimal suggestions to improve query efficiency. This tool leverages Flask for the backend, and offers a user-friendly interface built with HTML, CSS, and JavaScript. The performance of this tool has been extensively tested in the respective modules located in the "Tests" file and currently passes 113 test cases covering all components of functionality. 
 
 ## Features
 
 - **Query Analysis:** Parses SQL queries to extract tables, columns, joins, conditions, and subqueries.
 - **Explain Plan Inspection:** Retrieves and analyzes SQLite’s query execution plan to identify inefficiencies.
-- **Issue Detection:** Detects common issues such as full table scans, missing indexes, filesorts, unindexed joins, and unnecessary subqueries.
+- **Issue Detection:** Detects common issues such as full table scans, unnecessary filesorts, missing indexes, and more!
 - **Optimization Suggestions:** Offers tailored recommendations for query improvements based on detected issues.
 - **Interactive UI:** Provides an easy-to-use web interface to input SQL queries and database paths and view detailed results.
 - **Supports Common SQL Clauses:** Handles complex query components like WHERE, JOIN, ORDER BY, GROUP BY, HAVING, LIMIT, and subqueries.
