@@ -112,67 +112,51 @@ class QueryParser:
         joins = []
         tokens = self.parsed.tokens
         idx = 0
+    
         join_keywords = {
             "JOIN", "INNER JOIN", "LEFT JOIN", "LEFT OUTER JOIN", 
             "RIGHT JOIN", "RIGHT OUTER JOIN", "FULL JOIN", 
             "FULL OUTER JOIN", "CROSS JOIN", "NATURAL JOIN"
         }
     
-        stop_keywords = {"WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", ";"}
+        stop_keywords = {"GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", ";"}
     
         while idx < len(tokens):
             token = tokens[idx]
-            
-            if token.ttype is Keyword and any(keyword in token.value.upper() for keyword in join_keywords):
-                join_clause = token.value  
+            token_value_upper = token.value.upper().strip()
+    
+            # Stop scanning if a stop keyword is encountered outside a join clause
+            if token.ttype is Keyword and token_value_upper in stop_keywords:
+                break
+    
+            # Check if current token starts any join keyword
+            if token.ttype is Keyword and any(token_value_upper == join or token_value_upper.startswith(join + ' ') for join in join_keywords):
+                join_clause = token.value.strip()
                 next_idx = idx + 1
+    
                 while next_idx < len(tokens):
                     next_token = tokens[next_idx]
+                    next_token_value_upper = next_token.value.upper().strip()
     
-                    if next_token.ttype is Whitespace:
-                        next_idx += 1
-                        continue
-                    
-                    if isinstance(next_token, Identifier):
-                        join_clause += f" {next_token.value}"
-                        next_idx += 1
-    
-                    elif isinstance(next_token, IdentifierList):
-                        for identifier in next_token.get_identifiers():
-                            join_clause += f" {identifier.value}"
-                        next_idx += 1
-    
-                    elif next_token.ttype is Keyword and next_token.value.upper() in ["ON", "USING"]:
-                        join_clause += f" {next_token.value}"
-                        next_idx += 1
-                        
-                        while next_idx < len(tokens):
-                            cond_token = tokens[next_idx]
-                            token_value = cond_token.value.upper().strip() 
-                            token_array = re.findall(r"[\w']+|[^\w\s]", token_value)
-                            stop = False
-                            
-                            for i in range(len(token_array)):
-                                if token_array[i] in stop_keywords: 
-                                    stop = True
-                                    
-                            if stop or token_value in join_keywords:
-                                break
-                            
-                            join_clause += f"{cond_token.value}"
-                            next_idx += 1
-                        break  
-    
-                    else:
+                    # Stop if next token is a stop keyword or another join keyword
+                    if (next_token.ttype is Keyword and
+                        (next_token_value_upper in stop_keywords or
+                         any(next_token_value_upper == join or next_token_value_upper.startswith(join + ' ') for join in join_keywords)) or 
+                         next_token_value_upper.startswith("WHERE")):
                         break
+    
+                    # Add space if needed between tokens
+                    if not join_clause.endswith(' ') and not next_token.value.startswith(' '):
+                        join_clause += ' '
+                    join_clause += next_token.value
+                    next_idx += 1
     
                 joins.append(join_clause.strip())
                 idx = next_idx
             else:
                 idx += 1
     
-        joins = [join.strip().rstrip(';').rstrip(',') for join in joins]
-        
+        joins = [join.rstrip(';').rstrip(',').strip() for join in joins]
         return joins
     
     # Returns the conditions specified by the WHERE clause.
