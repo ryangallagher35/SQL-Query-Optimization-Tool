@@ -125,11 +125,9 @@ class QueryParser:
             token = tokens[idx]
             token_value_upper = token.value.upper().strip()
     
-            # Stop scanning if a stop keyword is encountered outside a join clause
             if token.ttype is Keyword and token_value_upper in stop_keywords:
                 break
     
-            # Check if current token starts any join keyword
             if token.ttype is Keyword and any(token_value_upper == join or token_value_upper.startswith(join + ' ') for join in join_keywords):
                 join_clause = token.value.strip()
                 next_idx = idx + 1
@@ -138,14 +136,12 @@ class QueryParser:
                     next_token = tokens[next_idx]
                     next_token_value_upper = next_token.value.upper().strip()
     
-                    # Stop if next token is a stop keyword or another join keyword
                     if (next_token.ttype is Keyword and
                         (next_token_value_upper in stop_keywords or
                          any(next_token_value_upper == join or next_token_value_upper.startswith(join + ' ') for join in join_keywords)) or 
                          next_token_value_upper.startswith("WHERE")):
                         break
     
-                    # Add space if needed between tokens
                     if not join_clause.endswith(' ') and not next_token.value.startswith(' '):
                         join_clause += ' '
                     join_clause += next_token.value
