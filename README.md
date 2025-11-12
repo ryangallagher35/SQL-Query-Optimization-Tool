@@ -22,6 +22,7 @@ The **SQL Query Optimization Tool** is a Python-based web application designed t
 
 1. **Clone the repository:**
 
+   ```bash
    git clone https://github.com/yourusername/sql-query-optimizer.git
    cd SQL-Query-Optimization-Tool
 
