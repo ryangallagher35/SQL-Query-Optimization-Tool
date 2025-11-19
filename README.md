@@ -11,7 +11,7 @@ The **SQL Query Optimization Tool** is a Python-based web application designed t
 
 ## Features
 
-- **Query Analysis:** Parses SQL queries to extract tables, columns, joins, conditions, and subqueries.
+- **Query Analysis:** Parses SQL queries to extract tables, columns, joins, conditions, and subqueries, ultimately providing a comprehensive query summary in the UI.
 - **Explain Plan Inspection:** Retrieves and analyzes SQLite’s query execution plan to identify inefficiencies.
 - **Issue Detection:** Detects common issues such as full table scans, unnecessary filesorts, missing indexes, and more!
 - **Optimization Suggestions:** Offers tailored recommendations for query improvements based on detected issues.
